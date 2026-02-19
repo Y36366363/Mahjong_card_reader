@@ -1,0 +1,1 @@
+# This Mahjong rules-only project uses only the Python standard library.
