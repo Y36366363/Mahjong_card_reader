@@ -35,6 +35,49 @@ pip install -r requirements.txt
 python main.py --hand "1m 1m 1m 2m 3m 4p 5p 6p 7s 8s 9s E E"
 ```
 
+## Using a config file (recommended)
+
+You can store your inputs in a config file and run without typing long tile strings each time.
+
+- `default_config.json` is auto-loaded if you run `python main.py` with no `--hand`.
+- Or pass a config path explicitly with `--config` / `-c`.
+
+### JSON example
+
+`default_config.json`:
+
+```json
+{
+  "hand": "1m 1m 1m 2m 3m 4p 5p 6p 7s 8s 9s E E",
+  "river": "9m 9m 9m"
+}
+```
+
+Run:
+
+```bash
+python main.py
+```
+
+Or:
+
+```bash
+python main.py -c default_config.json
+```
+
+### TOML example (Python 3.11+)
+
+```toml
+hand = "1m 1m 1m 2m 3m 4p 5p 6p 7s 8s 9s E E"
+river = "9m 9m 9m"
+```
+
+Run:
+
+```bash
+python main.py -c my_config.toml
+```
+
 ## Tile notation
 
 - Suits: `1m..9m`, `1p..9p`, `1s..9s`
