@@ -1,0 +1,15 @@
+{
+  "mode": "points",
+  "hand": "1m 1m 1m 2m 3m 4m 5m 6m 7m 8m 9m 9m 9m",
+  "river": "9m 9m 9m",
+  "points": {
+    "base_han": 1,
+    "fu": 30,
+    "win_type": "both",
+    "is_dealer": false,
+    "dora": [
+      "5m"
+    ],
+    "aka_dora": true
+  }
+}

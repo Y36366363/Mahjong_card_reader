@@ -50,6 +50,18 @@ def normalize_tile(tile: str) -> str:
     return t
 
 
+def is_red_five(tile: str) -> bool:
+    t = tile.strip()
+    return len(t) == 2 and t[0] == "0" and t[1] in ("m", "p", "s")
+
+
+def red_five_to_five(tile: str) -> str:
+    t = tile.strip()
+    if is_red_five(t):
+        return f"5{t[1]}"
+    return t
+
+
 def tile_to_index(tile: str) -> int:
     t = normalize_tile(tile)
     try:
@@ -64,7 +76,7 @@ def index_to_tile(idx: int) -> str:
     return _INDEX_TO_TILE[idx]
 
 
-def parse_tiles(text: str) -> list[str]:
+def parse_tiles(text: str, *, keep_red_fives: bool = False) -> list[str]:
     """
     Parse a space-separated tile string into canonical tokens.
 
@@ -72,6 +84,8 @@ def parse_tiles(text: str) -> list[str]:
       "1m 2m 3m E E 0p" -> ["1m","2m","3m","E","E","5p"]
     """
     tokens = [tok for tok in text.replace(",", " ").split() if tok.strip()]
+    if keep_red_fives:
+        return [tok.strip() for tok in tokens]
     return [normalize_tile(tok) for tok in tokens]
 
 

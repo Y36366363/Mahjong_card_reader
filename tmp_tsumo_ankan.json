@@ -1,0 +1,16 @@
+{
+  "mode": "points",
+  "hand": "1m 1m 1m 2m 3m 4m 5m 6m 7m 2p 3p 4p 9s",
+  "river": "",
+  "points": {
+    "win_type": "tsumo",
+    "win_tile": "9s",
+    "is_dealer": false,
+    "riichi": false,
+    "concealed_kong": true,
+    "concealed_kong_tile": "1m",
+    "dora": [],
+    "seat_wind": "E",
+    "round_wind": "E"
+  }
+}
