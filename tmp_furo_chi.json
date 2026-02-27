@@ -1,0 +1,18 @@
+{
+  "mode": "points",
+  "hand": "5m 6m 2p 3p 4p 6s 6s 6s 7p 7p 2m 3m 4m",
+  "river": "",
+  "points": {
+    "win_type": "ron",
+    "win_tile": "7m",
+    "is_dealer": false,
+    "riichi": false,
+    "furo_sets": 1,
+    "kan_sets": 0,
+    "ankan_tiles": [],
+    "kan_tiles": [],
+    "dora": [],
+    "seat_wind": "E",
+    "round_wind": "E"
+  }
+}

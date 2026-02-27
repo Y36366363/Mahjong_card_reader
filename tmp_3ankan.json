@@ -1,0 +1,22 @@
+{
+  "mode": "points",
+  "hand": "1m 1m 1m 1m 9s 9s 9s 9s 2p 2p 2p 2p 3m 3m 4m 5m",
+  "river": "",
+  "points": {
+    "win_type": "tsumo",
+    "win_tile": "6m",
+    "is_dealer": false,
+    "riichi": false,
+    "furo_sets": 0,
+    "kan_sets": 0,
+    "ankan_tiles": [
+      "1m",
+      "9s",
+      "2p"
+    ],
+    "kan_tiles": [],
+    "dora": [],
+    "seat_wind": "E",
+    "round_wind": "E"
+  }
+}

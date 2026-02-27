@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from points import estimate_points, estimate_yakuman_points
 from tenpai import is_agari_chiitoitsu, is_agari_kokushi, is_agari_standard
-from tiles import HONOR_NAMES, TERMINAL_HONOR_INDICES, TILE_INDICES, index_to_tile, parse_tiles, red_five_to_five, tile_to_index
+from tiles import TERMINAL_HONOR_INDICES, TILE_INDICES, index_to_tile, parse_tiles, red_five_to_five, tile_to_index
 
 
 @dataclass(frozen=True)
@@ -23,9 +23,9 @@ class Yakuman:
 class ScoreBreakdown:
     win_type: str  # "tsumo" or "ron"
     is_dealer: bool
-    hand13: list[str]  # raw tokens, may include 0m/0p/0s
+    hand: list[str]  # raw tokens excluding win tile; may include 0m/0p/0s
     win_tile: str  # raw token
-    full14_normalized: list[str]  # normalized (0->5)
+    full_normalized: list[str]  # normalized (0->5); includes extra tiles for kans
     yaku: list[Yaku]
     yakuman: list[Yakuman]
     han: int
@@ -37,7 +37,8 @@ class ScoreBreakdown:
 
 @dataclass(frozen=True)
 class Meld:
-    kind: str  # "chi" | "pon" | "kan" (concealed kan only, for now)
+    kind: str  # "chi" | "pon" | "kan"
+    open: bool  # True if furo/open meld, False if concealed
     tiles: tuple[int, int, int]  # indices (normalized)
 
 
@@ -96,7 +97,7 @@ def _decompose_standard_all(counts14: list[int]) -> list[Decomposition]:
         # triplet
         if counts[i] >= 3:
             counts[i] -= 3
-            melds.append(Meld(kind="pon", tiles=(i, i, i)))
+            melds.append(Meld(kind="pon", open=False, tiles=(i, i, i)))
             rec(counts, melds)
             melds.pop()
             counts[i] += 3
@@ -109,7 +110,7 @@ def _decompose_standard_all(counts14: list[int]) -> list[Decomposition]:
                 counts[i] -= 1
                 counts[i + 1] -= 1
                 counts[i + 2] -= 1
-                melds.append(Meld(kind="chi", tiles=(i, i + 1, i + 2)))
+                melds.append(Meld(kind="chi", open=False, tiles=(i, i + 1, i + 2)))
                 rec(counts, melds)
                 melds.pop()
                 counts[i] += 1
@@ -161,7 +162,7 @@ def _decompose_standard_with_fixed_melds(
         # triplet
         if counts_work[i] >= 3:
             counts_work[i] -= 3
-            melds.append(Meld(kind="pon", tiles=(i, i, i)))
+            melds.append(Meld(kind="pon", open=False, tiles=(i, i, i)))
             rec(counts_work, melds, pair_idx)
             melds.pop()
             counts_work[i] += 3
@@ -174,7 +175,7 @@ def _decompose_standard_with_fixed_melds(
                 counts_work[i] -= 1
                 counts_work[i + 1] -= 1
                 counts_work[i + 2] -= 1
-                melds.append(Meld(kind="chi", tiles=(i, i + 1, i + 2)))
+                melds.append(Meld(kind="chi", open=False, tiles=(i, i + 1, i + 2)))
                 rec(counts_work, melds, pair_idx)
                 melds.pop()
                 counts_work[i] += 1
@@ -284,12 +285,17 @@ def _meld_fu(decomp: Decomposition) -> int:
     for m in decomp.melds:
         if m.kind not in {"pon", "kan"}:
             continue
+        is_term = _is_terminal_or_honor_idx(m.tiles[0])
         if m.kind == "pon":
-            base = 8 if _is_terminal_or_honor_idx(m.tiles[0]) else 4  # concealed triplet
-            fu += base
-        else:
-            base = 32 if _is_terminal_or_honor_idx(m.tiles[0]) else 16  # concealed kan
-            fu += base
+            if m.open:
+                fu += 4 if is_term else 2
+            else:
+                fu += 8 if is_term else 4
+        else:  # kan
+            if m.open:
+                fu += 16 if is_term else 8
+            else:
+                fu += 32 if is_term else 16
     return fu
 
 
@@ -312,11 +318,16 @@ def _fu_standard(
     seat_wind: str,
     round_wind: str,
     is_pinfu: bool,
+    is_closed: bool,
 ) -> int:
     # Base fu
+    if is_pinfu and win_type == "tsumo":
+        return 20
+
     fu = 20
     if win_type == "ron":
-        fu += 10  # menzen ron (this engine currently assumes closed hands only)
+        if is_closed:
+            fu += 10  # menzen ron
     else:
         fu += 2  # tsumo
 
@@ -326,11 +337,11 @@ def _fu_standard(
 
     # Pinfu special: no fu other than tsumo/ron; still rounds
     if is_pinfu:
-        fu = 20 + (2 if win_type == "tsumo" else 10)
+        fu = 30 if (win_type == "ron" and is_closed) else 20
 
     # round up to 10
     fu = ((fu + 9) // 10) * 10
-    return max(fu, 30) if not (is_pinfu and win_type == "tsumo") else fu
+    return max(fu, 30)
 
 
 def _yakuman_from_tiles(full14_counts: list[int], full14_norm: list[str], *, win_type: str, decomp: Decomposition | None, win_idx: int | None) -> list[Yakuman]:
@@ -378,7 +389,7 @@ def _yakuman_from_tiles(full14_counts: list[int], full14_norm: list[str], *, win
 
 def score_points_from_config(
     *,
-    hand13_text: str,
+    hand_text: str,
     win_tile_text: str,
     win_type: str,
     is_dealer: bool,
@@ -386,80 +397,129 @@ def score_points_from_config(
     seat_wind: str = "E",
     round_wind: str = "E",
     riichi: bool = False,
-    concealed_kong: bool = False,
-    concealed_kong_tile_text: str | None = None,
+    furo_sets: int = 0,
+    kan_sets: int = 0,
+    ankan_tiles: list[str] | None = None,
+    kan_tiles: list[str] | None = None,
 ) -> ScoreBreakdown:
     """
     Main entrypoint for points mode.
 
     Inputs:
-      - hand13_text: 13 tiles (may include 0m/0p/0s)
+      - hand_text: tiles excluding the win tile (may include 0m/0p/0s)
       - win_tile_text: the winning tile (tsumo draw or ron tile)
       - win_type: "tsumo" or "ron"
       - dora_text: optional tiles that are dora (NOT indicators), space-separated
 
     Assumptions:
-      - hand is closed (menzen)
-      - optional: one concealed kong (ankan)
+      - supports open melds (furo) and multiple kans via config
     """
     if win_type not in {"tsumo", "ron"}:
         raise ValueError("win_type must be 'tsumo' or 'ron'")
 
-    hand13_raw = parse_tiles(hand13_text, keep_red_fives=True)
-    if len(hand13_raw) != 13:
-        raise ValueError("In points mode, 'hand' must contain exactly 13 tiles.")
+    hand_raw = parse_tiles(hand_text, keep_red_fives=True)
     win_raw_list = parse_tiles(win_tile_text, keep_red_fives=True)
     if len(win_raw_list) != 1:
         raise ValueError("'win_tile' must be exactly one tile.")
     win_raw = win_raw_list[0]
 
-    # Normalize for structural analysis (0->5), but preserve raw for aka dora
-    full14_norm = [red_five_to_five(t) for t in hand13_raw] + [red_five_to_five(win_raw)]
+    ankan_tiles = ankan_tiles or []
+    kan_tiles = kan_tiles or []
+    if kan_sets != len(kan_tiles):
+        raise ValueError("kan_sets must equal len(kan_tiles).")
+    if furo_sets < 0 or kan_sets < 0 or kan_sets > furo_sets:
+        raise ValueError("Invalid furo/kan counts: require 0 <= kan_sets <= furo_sets.")
 
+    total_kans = len(ankan_tiles) + len(kan_tiles)
+    expected_hand_len = 13 + total_kans
+    if len(hand_raw) != expected_hand_len:
+        raise ValueError(f"In points mode, 'hand' must contain exactly {expected_hand_len} tiles (13 + total_kans).")
+
+    # Parse furo melds from the end of hand (open melds).
+    remaining = hand_raw.copy()
     fixed_melds: list[Meld] = []
-    extra_tiles_norm: list[str] = []
-    if concealed_kong:
-        if not concealed_kong_tile_text:
-            raise ValueError("concealed_kong is true but concealed_kong_tile is missing.")
-        kong_raw_list = parse_tiles(concealed_kong_tile_text, keep_red_fives=True)
-        if len(kong_raw_list) != 1:
-            raise ValueError("concealed_kong_tile must be exactly one tile.")
-        kong_norm = red_five_to_five(kong_raw_list[0])
-        provided_cnt = sum(1 for t in full14_norm if t == kong_norm)
-        if provided_cnt != 3:
-            raise ValueError(
-                f"concealed_kong_tile='{kong_raw_list[0]}' requires exactly 3 copies in (hand + win_tile), found {provided_cnt}."
-            )
-        extra_tiles_norm.append(kong_norm)
-        kong_idx = tile_to_index(kong_norm)
-        fixed_melds.append(Meld(kind="kan", tiles=(kong_idx, kong_idx, kong_idx)))
 
-    full_tiles_norm = full14_norm + extra_tiles_norm
+    # Open kans: last kan_sets melds among the furo block; each is 4 identical tiles.
+    open_kan_tiles_norm = [red_five_to_five(t) for t in kan_tiles]
+    open_kan_pool = open_kan_tiles_norm.copy()
+
+    for _ in range(kan_sets):
+        if len(remaining) < 4:
+            raise ValueError("Not enough tiles to parse open kan meld(s) from the end of hand.")
+        meld_tiles_raw = [remaining.pop(), remaining.pop(), remaining.pop(), remaining.pop()]
+        meld_tiles_norm = [red_five_to_five(t) for t in meld_tiles_raw]
+        if len(set(meld_tiles_norm)) != 1:
+            raise ValueError("Open kan meld must be four identical tiles.")
+        tile_norm = meld_tiles_norm[0]
+        if tile_norm not in open_kan_pool:
+            raise ValueError(f"Open kan tile '{tile_norm}' not found in kan_tiles list.")
+        open_kan_pool.remove(tile_norm)
+        idx = tile_to_index(tile_norm)
+        fixed_melds.append(Meld(kind="kan", open=True, tiles=(idx, idx, idx)))
+
+    # Remaining open furo melds (chi/pon): 3 tiles each.
+    open_melds_to_parse = furo_sets - kan_sets
+    for _ in range(open_melds_to_parse):
+        if len(remaining) < 3:
+            raise ValueError("Not enough tiles to parse furo meld(s) from the end of hand.")
+        meld_tiles_raw = [remaining.pop(), remaining.pop(), remaining.pop()]
+        meld_tiles_norm = [red_five_to_five(t) for t in meld_tiles_raw]
+        if len(set(meld_tiles_norm)) == 1:
+            idx = tile_to_index(meld_tiles_norm[0])
+            fixed_melds.append(Meld(kind="pon", open=True, tiles=(idx, idx, idx)))
+            continue
+        # chi: same suit, consecutive
+        try:
+            idxs = sorted(tile_to_index(t) for t in meld_tiles_norm)
+        except Exception as e:
+            raise ValueError(f"Invalid tiles in furo meld: {meld_tiles_raw}") from e
+        suits = {_suit_of_idx(i) for i in idxs}
+        if None in suits or len(suits) != 1:
+            raise ValueError(f"Furo chi meld must be suited tiles: got {meld_tiles_norm}")
+        if not (idxs[0] + 1 == idxs[1] and idxs[1] + 1 == idxs[2]):
+            raise ValueError(f"Furo chi meld must be consecutive tiles: got {meld_tiles_norm}")
+        fixed_melds.append(Meld(kind="chi", open=True, tiles=(idxs[0], idxs[1], idxs[2])))
+
+    # Concealed kans (ankan): provided as a list of tile names.
+    for t in ankan_tiles:
+        tile_norm = red_five_to_five(t)
+        idx = tile_to_index(tile_norm)
+        fixed_melds.append(Meld(kind="kan", open=False, tiles=(idx, idx, idx)))
+
+    # Normalize for structural analysis (0->5), but preserve raw for aka dora
+    full_norm = [red_five_to_five(t) for t in hand_raw] + [red_five_to_five(win_raw)]
     full_counts = [0] * 34
-    for t in full_tiles_norm:
+    for t in full_norm:
         full_counts[tile_to_index(t)] += 1
 
     dora_tiles_raw: list[str] = []
     if dora_text:
         dora_tiles_raw = parse_tiles(dora_text, keep_red_fives=True)
 
-    aka_dora = _aka_dora_han(hand13_raw, win_raw)
-    dora_han = _dora_han(full_tiles_norm, dora_tiles_raw)
+    aka_dora = _aka_dora_han(hand_raw, win_raw)
+    dora_han = _dora_han(full_norm, dora_tiles_raw)
 
     yakuman: list[Yakuman] = []
     yaku: list[Yaku] = []
 
     # Special hands first
-    if (not concealed_kong) and is_agari_kokushi(full_counts):
+    is_closed = not any(m.open for m in fixed_melds)
+    if riichi and not is_closed:
+        raise ValueError("riichi=true is not allowed when the hand is open (furo).")
+
+    if total_kans == 4:
+        yakuman.append(Yakuman("Suukantsu"))
+
+    if total_kans == 0 and is_agari_kokushi(full_counts):
         yakuman = [Yakuman("Kokushi Musou")]
         yakuman_mult = sum(y.multiplier for y in yakuman)
         pts = estimate_yakuman_points(yakuman_multiplier=yakuman_mult, is_dealer=is_dealer, win_type=win_type)
         return ScoreBreakdown(
             win_type=win_type,
             is_dealer=is_dealer,
-            hand13=hand13_raw,
+            hand=hand_raw,
             win_tile=win_raw,
-            full14_normalized=full14_norm,
+            full_normalized=full_norm,
             yaku=[],
             yakuman=yakuman,
             han=0,
@@ -470,23 +530,23 @@ def score_points_from_config(
         )
 
     # Chiitoitsu
-    if (not concealed_kong) and is_agari_chiitoitsu(full_counts):
+    if total_kans == 0 and furo_sets == 0 and is_agari_chiitoitsu(full_counts):
         yaku.append(Yaku("Chiitoitsu", 2))
         if riichi:
             yaku.append(Yaku("Riichi", 1))
-        if win_type == "tsumo":
+        if win_type == "tsumo" and is_closed:
             yaku.append(Yaku("Menzen Tsumo", 1))
         han = sum(y.han_closed for y in yaku) + dora_han + aka_dora
         fu = 25
-        if win_type == "ron" and not yaku:
-            raise ValueError("Ron is not allowed: no yaku (dora/aka-dora do not count as yaku).")
+        if not yaku:
+            raise ValueError("Winning hand has no yaku (dora/aka-dora do not count as yaku).")
         pts = estimate_points(han=han, fu=fu, is_dealer=is_dealer, win_type=win_type)
         return ScoreBreakdown(
             win_type=win_type,
             is_dealer=is_dealer,
-            hand13=hand13_raw,
+            hand=hand_raw,
             win_tile=win_raw,
-            full14_normalized=full14_norm,
+            full_normalized=full_norm,
             yaku=yaku,
             yakuman=[],
             han=han,
@@ -497,15 +557,21 @@ def score_points_from_config(
         )
 
     # Standard hand (4 melds + pair)
-    if concealed_kong:
-        if sum(full_counts) != 15:
-            raise ValueError("Concealed kong enabled but total tile count is not 15 after applying it.")
-        counts_for_decomp = full_counts.copy()
-        kan_idx = fixed_melds[0].tiles[0]
-        counts_for_decomp[kan_idx] -= 4
-        decomps = _decompose_standard_with_fixed_melds(counts_for_decomp, fixed_melds=fixed_melds, melds_needed=3)
-    else:
-        decomps = _decompose_standard_all(full_counts)
+    melds_needed = 4 - len(fixed_melds)
+    if melds_needed < 0:
+        raise ValueError("Too many fixed melds (furo + kans).")
+
+    counts_for_decomp = full_counts.copy()
+    for m in fixed_melds:
+        remove_n = 4 if m.kind == "kan" else 3
+        idxs = list(m.tiles)
+        for i in range(remove_n):
+            idx = idxs[0] if m.kind in {"pon", "kan"} else idxs[i]
+            counts_for_decomp[idx] -= 1
+            if counts_for_decomp[idx] < 0:
+                raise ValueError("Fixed meld tiles do not match the provided hand tiles.")
+
+    decomps = _decompose_standard_with_fixed_melds(counts_for_decomp, fixed_melds=fixed_melds, melds_needed=melds_needed)
     if not decomps:
         raise ValueError("Hand is not a winning hand with the provided win_tile.")
 
@@ -513,7 +579,9 @@ def score_points_from_config(
 
     best: ScoreBreakdown | None = None
     for decomp in decomps:
-        yakuman = _yakuman_from_tiles(full_counts, full_tiles_norm, win_type=win_type, decomp=decomp, win_idx=win_idx)
+        yakuman = _yakuman_from_tiles(full_counts, full_norm, win_type=win_type, decomp=decomp, win_idx=win_idx)
+        if total_kans == 4:
+            yakuman = [Yakuman("Suukantsu")]
         if yakuman:
             # For now, treat yakuman as limit; do not add dora/aka-dora.
             yakuman_mult = sum(y.multiplier for y in yakuman)
@@ -521,9 +589,9 @@ def score_points_from_config(
             cand = ScoreBreakdown(
                 win_type=win_type,
                 is_dealer=is_dealer,
-                hand13=hand13_raw,
+                hand=hand_raw,
                 win_tile=win_raw,
-                full14_normalized=full14_norm,
+                full_normalized=full_norm,
                 yaku=[],
                 yakuman=yakuman,
                 han=0,
@@ -536,19 +604,21 @@ def score_points_from_config(
             yaku = []
             if riichi:
                 yaku.append(Yaku("Riichi", 1))
-            if win_type == "tsumo":
+            if win_type == "tsumo" and is_closed:
                 yaku.append(Yaku("Menzen Tsumo", 1))
+            if total_kans == 3:
+                yaku.append(Yaku("Sankantsu", 2))
 
             # Tile-only yaku
-            if _is_all_simples(full_tiles_norm):
+            if _is_all_simples(full_norm):
                 yaku.append(Yaku("Tanyao", 1))
 
-            suits, has_honors = _suits_used(full_tiles_norm)
+            suits, has_honors = _suits_used(full_norm)
             if len(suits) == 1:
                 if has_honors:
-                    yaku.append(Yaku("Honitsu", 3))
+                    yaku.append(Yaku("Honitsu", 3 if is_closed else 2))
                 else:
-                    yaku.append(Yaku("Chinitsu", 6))
+                    yaku.append(Yaku("Chinitsu", 6 if is_closed else 5))
 
             if _is_toitoi(decomp):
                 yaku.append(Yaku("Toitoi", 2))
@@ -560,12 +630,12 @@ def score_points_from_config(
             # Pinfu (needs ryanmen wait; we approximate by "not (edge/closed/pair wait)")
             pinfu_candidate = _is_pinfu_candidate(decomp, seat_wind=seat_wind, round_wind=round_wind)
             wait_fu = _wait_fu(decomp, win_idx=win_idx)
-            is_pinfu = pinfu_candidate and wait_fu == 0
+            is_pinfu = is_closed and pinfu_candidate and wait_fu == 0
             if is_pinfu:
                 yaku.append(Yaku("Pinfu", 1))
 
-            if win_type == "ron" and not yaku:
-                raise ValueError("Ron is not allowed: no yaku (dora/aka-dora do not count as yaku).")
+            if not yaku:
+                raise ValueError("Winning hand has no yaku (dora/aka-dora do not count as yaku).")
 
             han = sum(y.han_closed for y in yaku) + dora_han + aka_dora
             fu = _fu_standard(
@@ -575,14 +645,15 @@ def score_points_from_config(
                 seat_wind=seat_wind,
                 round_wind=round_wind,
                 is_pinfu=is_pinfu,
+                is_closed=is_closed,
             )
             pts = estimate_points(han=han, fu=fu, is_dealer=is_dealer, win_type=win_type)
             cand = ScoreBreakdown(
                 win_type=win_type,
                 is_dealer=is_dealer,
-                hand13=hand13_raw,
+                hand=hand_raw,
                 win_tile=win_raw,
-                full14_normalized=full14_norm,
+                full_normalized=full_norm,
                 yaku=yaku,
                 yakuman=[],
                 han=han,

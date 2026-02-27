@@ -1,5 +1,18 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 2/27/2026
+
+- Added **Furo (open-hand) support** in points mode:
+  - `points.furo_sets` controls how many meld sets at the end of `hand` are treated as open melds.
+  - `points.kan_sets` controls how many of those open melds are kans.
+- Upgraded kan handling to support **multiple kans**:
+  - `points.ankan_tiles` (concealed kans) and `points.kan_tiles` (open kans).
+  - Added **Sankantsu** (Three Kans) and **Suukantsu** yakuman (Four Kans).
+- Updated scoring rules for **open vs closed** hands (e.g. riichi/menzen-tsumo/pinfu restrictions and open/closed han differences for flushes).
+- Remaining tiles output fixes:
+  - In points mode, `points.win_tile` is also removed from remaining tiles.
+  - Remaining tiles now include **zeros** (e.g. `9m:0`).
+
 ## Updates 2/26/2026
 
 - Added config-driven **modes**: `tenpai` (analysis) and `points` (scoring).
@@ -84,8 +97,8 @@ You can store your inputs in a config file and run without typing long tile stri
     "win_tile": "5m",
     "is_dealer": false,
     "riichi": true,
-    "concealed_kong": false,
-    "concealed_kong_tile": "5m",
+    "ankan": false,
+    "ankan_tile": "5m",
     "dora": ["5m"]
   }
 }
@@ -111,13 +124,16 @@ Set `"mode": "points"` and configure `"points"`:
 - `win_tile`: the winning tile (one tile, e.g. `"5m"` or `"0p"`)
 - `is_dealer`: `true/false`
 - `riichi`: `true/false` (adds 1 han if true)
-- `concealed_kong`: `true/false` (ankan)
-- `concealed_kong_tile`: one tile (required if `concealed_kong=true`). The hand must contain exactly 3 copies across (hand + win_tile); the 4th copy is implied by the kan for fu/dora counting.
+- `furo_sets`: number of open meld sets (furo) in `hand` (0..4). These meld tiles must be placed at the very end of `hand`.
+- `kan_sets`: number of open kan melds among the furo sets. These are assumed to be the last `kan_sets` sets in the furo block.
+- `ankan_tiles`: list of concealed kan tiles (each entry is one tile name). Example: `["1m","9s"]`
+- `kan_tiles`: list of open kan tiles (each entry is one tile name). Example: `["5p"]`
 - `dora`: list of dora tiles (e.g. `["3m","7p"]`) (tiles, not indicators)
 - `seat_wind`: `"E"|"S"|"W"|"N"` (optional; default `"E"`)
 - `round_wind`: `"E"|"S"|"W"|"N"` (optional; default `"E"`)
 
-In points mode, `hand` must be exactly 13 tiles. Red fives should be written as `0m/0p/0s` and are automatically counted as aka-dora.
+In points mode, `hand` must be exactly \(13 + \text{total_kans}\) tiles (excluding `win_tile`), where `total_kans = len(ankan_tiles) + len(kan_tiles)`.
+Red fives should be written as `0m/0p/0s` and are automatically counted as aka-dora.
 
 ### TOML example (Python 3.11+)
 
@@ -131,8 +147,10 @@ win_type = "tsumo"
 win_tile = "5m"
 is_dealer = false
 riichi = true
-concealed_kong = false
-concealed_kong_tile = "5m"
+furo_sets = 0
+kan_sets = 0
+ankan_tiles = []
+kan_tiles = []
 dora = ["5m"]
 seat_wind = "E"
 round_wind = "E"

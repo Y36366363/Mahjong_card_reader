@@ -47,6 +47,13 @@ def _tiles_field_to_str(value: Any, *, field_name: str) -> str | None:
     raise ValueError(f"Config field '{field_name}' must be a string or a list of strings.")
 
 
+def _tiles_field_to_list(value: Any, *, field_name: str) -> list[str]:
+    s = _tiles_field_to_str(value, field_name=field_name)
+    if not s:
+        return []
+    return parse_tiles(s, keep_red_fives=True)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Riichi Mahjong: shanten + tenpai waits + remaining tiles")
     ap.add_argument(
@@ -152,8 +159,17 @@ def main() -> None:
             seat_wind = str(points_cfg.get("seat_wind", "E")).strip()
             round_wind = str(points_cfg.get("round_wind", "E")).strip()
             riichi = bool(points_cfg.get("riichi", False))
-            concealed_kong = bool(points_cfg.get("concealed_kong", False))
-            concealed_kong_tile = str(points_cfg.get("concealed_kong_tile", "")).strip() or None
+            furo_sets = int(points_cfg.get("furo_sets", 0))
+            kan_sets = int(points_cfg.get("kan_sets", 0))
+            ankan_tiles = _tiles_field_to_list(points_cfg.get("ankan_tiles"), field_name="ankan_tiles")
+            kan_tiles = _tiles_field_to_list(points_cfg.get("kan_tiles"), field_name="kan_tiles")
+
+            # Backward compatibility: old single-ankan fields
+            if not ankan_tiles:
+                old_ankan = bool(points_cfg.get("ankan", points_cfg.get("concealed_kong", False)))
+                old_ankan_tile = str(points_cfg.get("ankan_tile", points_cfg.get("concealed_kong_tile", ""))).strip()
+                if old_ankan and old_ankan_tile:
+                    ankan_tiles = parse_tiles(old_ankan_tile, keep_red_fives=True)
         except Exception as e:
             ap.error(f"Invalid points config: {e}")
 
@@ -162,24 +178,33 @@ def main() -> None:
         if not win_tile:
             ap.error("Points mode requires points.win_tile (one tile like '5m' or '0p').")
 
+        # Remaining tiles should also exclude the winning tile.
+        counter.set_used_tiles(hand_tiles + river_tiles + parse_tiles(win_tile))
+
         print("Points estimation")
         print(f"  win_type   : {win_type}")
         print(f"  win_tile   : {win_tile}")
         print(f"  is_dealer  : {'YES' if is_dealer else 'NO'}")
         print(f"  riichi     : {'YES' if riichi else 'NO'}")
-        print(f"  ankan      : {'YES' if concealed_kong else 'NO'}")
-        if concealed_kong:
-            print(f"  ankan tile : {concealed_kong_tile}")
+        print(f"  furo_sets  : {furo_sets}")
+        print(f"  kan_sets   : {kan_sets}")
+        print(f"  ankan_tiles: {' '.join(ankan_tiles) if ankan_tiles else '(none)'}")
+        print(f"  kan_tiles  : {' '.join(kan_tiles) if kan_tiles else '(none)'}")
         print(f"  seat_wind  : {seat_wind}")
         print(f"  round_wind : {round_wind}")
         print(f"  dora       : {dora_text or '(none)'}")
 
-        if len(parse_tiles(hand_str, keep_red_fives=True)) != 13:
-            ap.error("In points mode, 'hand' must contain exactly 13 tiles (winning tile goes in points.win_tile).")
+        hand_len = len(parse_tiles(hand_str, keep_red_fives=True))
+        expected_len = 13 + len(ankan_tiles) + len(kan_tiles)
+        if hand_len != expected_len:
+            ap.error(
+                f"In points mode, 'hand' must contain exactly {expected_len} tiles (13 + total_kans). "
+                "Put furo tiles at the end, and put the winning tile in points.win_tile."
+            )
 
         try:
             sb = score_points_from_config(
-                hand13_text=hand_str,
+                hand_text=hand_str,
                 win_tile_text=win_tile,
                 win_type=win_type,
                 is_dealer=is_dealer,
@@ -187,8 +212,10 @@ def main() -> None:
                 seat_wind=seat_wind,
                 round_wind=round_wind,
                 riichi=riichi,
-                concealed_kong=concealed_kong,
-                concealed_kong_tile_text=concealed_kong_tile,
+                furo_sets=furo_sets,
+                kan_sets=kan_sets,
+                ankan_tiles=ankan_tiles,
+                kan_tiles=kan_tiles,
             )
         except Exception as e:
             ap.error(str(e))
@@ -214,8 +241,8 @@ def main() -> None:
                 )
         print()
 
-    print("Remaining tiles (nonzero)")
-    print(f"  {counter.pretty_remaining(only_nonzero=True)}")
+    print("Remaining tiles (including zeros)")
+    print(f"  {counter.pretty_remaining(only_nonzero=False)}")
 
 
 if __name__ == "__main__":
