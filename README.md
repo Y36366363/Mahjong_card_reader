@@ -1,5 +1,13 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 2/28/2026
+
+- Tenpai mode enhancement: when `Tenpai: NO` but **minimum shanten = 1**, the program now lists **which draw tile(s)** can reach tenpai after **one draw + one discard**.
+- Added **invalid-case validation**: if any tile appears **more than 4 times** across inputs (e.g. `9m:5`), the run stops and reports the invalid tile counts instead of computing results.
+- Remaining tiles output is now more explicit:
+  - In points mode, `points.win_tile` is removed from remaining tiles.
+  - Remaining tiles include **zeros** (e.g. `9m:0`).
+
 ## Updates 2/27/2026
 
 - Added **Furo (open-hand) support** in points mode:

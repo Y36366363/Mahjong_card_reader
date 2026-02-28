@@ -9,7 +9,7 @@ from remaining import RemainingTileCounter
 from scoring import score_points_from_config
 from shanten import calculate_shanten_all
 from tenpai import tenpai_waits_for_13
-from tiles import parse_tiles, tiles_to_counts
+from tiles import index_to_tile, parse_tiles, tile_to_index, tiles_to_counts
 
 
 def _load_config(path: Path) -> dict[str, Any]:
@@ -52,6 +52,53 @@ def _tiles_field_to_list(value: Any, *, field_name: str) -> list[str]:
     if not s:
         return []
     return parse_tiles(s, keep_red_fives=True)
+
+
+def _tile_sort_key(tile: str) -> tuple[int, int]:
+    if len(tile) == 2 and tile[1] in ("m", "p", "s"):
+        suit_order = {"m": 0, "p": 1, "s": 2}[tile[1]]
+        return (suit_order, int(tile[0]))
+    honor_order = {"E": 3, "S": 4, "W": 5, "N": 6, "P": 7, "F": 8, "C": 9}
+    return (honor_order.get(tile, 99), 0)
+
+
+def _draws_to_reach_tenpai(hand13_tiles: list[str]) -> list[str]:
+    """
+    For a 13-tile hand, return draw tiles which allow reaching tenpai
+    after drawing 1 tile and discarding 1 tile.
+    """
+    counts13 = tiles_to_counts(hand13_tiles)
+    good_draws: list[str] = []
+    for draw_idx in range(34):
+        if counts13[draw_idx] >= 4:
+            continue
+        counts14 = counts13.copy()
+        counts14[draw_idx] += 1
+        can_reach = False
+        for discard_idx in range(34):
+            if counts14[discard_idx] <= 0:
+                continue
+            counts13p = counts14.copy()
+            counts13p[discard_idx] -= 1
+            if tenpai_waits_for_13(counts13p).is_tenpai:
+                can_reach = True
+                break
+        if can_reach:
+            good_draws.append(index_to_tile(draw_idx))
+    good_draws.sort(key=_tile_sort_key)
+    return good_draws
+
+
+def _validate_no_more_than_four(tiles: list[str]) -> list[tuple[str, int]]:
+    counts = [0] * 34
+    for t in tiles:
+        counts[tile_to_index(t)] += 1
+    over: list[tuple[str, int]] = []
+    for i, c in enumerate(counts):
+        if c > 4:
+            over.append((index_to_tile(i), c))
+    over.sort(key=lambda x: _tile_sort_key(x[0]))
+    return over
 
 
 def main() -> None:
@@ -113,6 +160,23 @@ def main() -> None:
     hand_tiles = parse_tiles(hand_str)
     river_tiles = parse_tiles(river_str) if river_str else []
 
+    # Validate impossible inputs (more than 4 copies of a tile).
+    used_for_validation = hand_tiles + river_tiles
+    if mode == "points":
+        points_cfg = config.get("points", config)
+        win_tile_str = str(points_cfg.get("win_tile", "")).strip()
+        if not win_tile_str:
+            ap.error("Points mode requires points.win_tile (one tile like '5m' or '0p').")
+        win_tiles = parse_tiles(win_tile_str)
+        if len(win_tiles) != 1:
+            ap.error("Points mode requires points.win_tile to be exactly one tile.")
+        used_for_validation = used_for_validation + win_tiles
+
+    over = _validate_no_more_than_four(used_for_validation)
+    if over:
+        msg = ", ".join(f"{tile}:{count}" for tile, count in over)
+        ap.error(f"Invalid case: more than 4 copies of a tile were provided ({msg}).")
+
     sh = calculate_shanten_all(hand_tiles)
 
     counter = RemainingTileCounter()
@@ -147,6 +211,10 @@ def main() -> None:
             if waits.kokushi_waits:
                 print(f"  Kokushi waits    : {' '.join(waits.kokushi_waits)}")
             print(f"  All waits        : {' '.join(waits.all_waits)}")
+        elif sh.minimum == 1:
+            draws = _draws_to_reach_tenpai(hand_tiles)
+            print("  One draw to tenpai (draw + discard)")
+            print(f"    {' '.join(draws) if draws else '(none)'}")
         print()
 
     if mode == "points":
