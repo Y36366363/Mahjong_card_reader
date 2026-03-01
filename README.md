@@ -1,5 +1,12 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 3/01/2026
+
+- Added **ura-dora prediction** in points mode:
+  - **Ura-dora rate**: proportion of remaining tiles that, when revealed as ura-dora indicators, would give at least 1 ura-dora han.
+  - **Expected ura-dora**: expected number of ura-dora han, accounting for multiple copies in hand (e.g., 3×9m with indicator 8m yields 3 ura-dora).
+  - Number of ura-dora indicators = 1 + number of kans.
+
 ## Updates 2/28/2026
 
 - Tenpai mode enhancement: when `Tenpai: NO` but **minimum shanten = 1**, the program now lists **which draw tile(s)** can reach tenpai after **one draw + one discard**.

@@ -62,6 +62,32 @@ def _tile_sort_key(tile: str) -> tuple[int, int]:
     return (honor_order.get(tile, 99), 0)
 
 
+def _ura_dora_next_idx(idx: int) -> int:
+    """Index of ura-dora tile when the indicator is tile at idx. E.g. 8m->9m, 9m->1m, E->S, C->E."""
+    if idx < 27:  # suited
+        return (idx // 9) * 9 + (idx % 9 + 1) % 9
+    return 27 + ((idx - 27) + 1) % 7  # honors
+
+
+def _compute_ura_dora(hand_counts: list[int], remaining_counts: list[int], num_ura_indicators: int) -> tuple[float, float]:
+    """
+    Returns (ura_dora_rate, expected_ura_dora).
+    - ura_dora_rate: proportion of remaining tiles that, as indicators, would give at least 1 ura-dora han.
+    - expected_ura_dora: expected total ura-dora han across all indicators.
+    """
+    total = sum(remaining_counts)
+    if total <= 0:
+        return (0.0, 0.0)
+    rate = 0.0
+    expected_per_ind = 0.0
+    for i in range(34):
+        ura_idx = _ura_dora_next_idx(i)
+        if hand_counts[ura_idx] > 0:
+            rate += remaining_counts[i] / total
+        expected_per_ind += (remaining_counts[i] / total) * hand_counts[ura_idx]
+    return (rate, expected_per_ind * num_ura_indicators)
+
+
 def _draws_to_reach_tenpai(hand13_tiles: list[str]) -> list[str]:
     """
     For a 13-tile hand, return draw tiles which allow reaching tenpai
@@ -307,6 +333,14 @@ def main() -> None:
                     f"  Tsumo  : dealer pays {p.tsumo_dealer_points}, others pay {p.tsumo_non_dealer_points} "
                     f"(total {p.tsumo_total_points})"
                 )
+
+        # Ura-dora prediction (only when riichi would apply; ura exists for riichi wins)
+        num_ura_indicators = 1 + len(ankan_tiles) + len(kan_tiles)
+        hand_counts = tiles_to_counts(sb.full_normalized)
+        remaining_counts = counter.remaining_counts()
+        ura_rate, expected_ura = _compute_ura_dora(hand_counts, remaining_counts, num_ura_indicators)
+        print(f"  Ura-dora rate     : {ura_rate:.1%}  (prob. an indicator yields ura-dora)")
+        print(f"  Expected ura-dora : {expected_ura:.2f} han  ({num_ura_indicators} indicator(s))")
         print()
 
     print("Remaining tiles (including zeros)")
