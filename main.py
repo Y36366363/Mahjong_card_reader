@@ -334,13 +334,14 @@ def main() -> None:
                     f"(total {p.tsumo_total_points})"
                 )
 
-        # Ura-dora prediction (only when riichi would apply; ura exists for riichi wins)
-        num_ura_indicators = 1 + len(ankan_tiles) + len(kan_tiles)
-        hand_counts = tiles_to_counts(sb.full_normalized)
-        remaining_counts = counter.remaining_counts()
-        ura_rate, expected_ura = _compute_ura_dora(hand_counts, remaining_counts, num_ura_indicators)
-        print(f"  Ura-dora rate     : {ura_rate:.1%}  (prob. an indicator yields ura-dora)")
-        print(f"  Expected ura-dora : {expected_ura:.2f} han  ({num_ura_indicators} indicator(s))")
+        # Ura-dora prediction (only when riichi; no ura is counted when riichi=false)
+        if riichi:
+            num_ura_indicators = 1 + len(ankan_tiles) + len(kan_tiles)
+            hand_counts = tiles_to_counts(sb.full_normalized)
+            remaining_counts = counter.remaining_counts()
+            ura_rate, expected_ura = _compute_ura_dora(hand_counts, remaining_counts, num_ura_indicators)
+            print(f"  Ura-dora rate     : {ura_rate:.1%}  (prob. an indicator yields ura-dora)")
+            print(f"  Expected ura-dora : {expected_ura:.2f} han  ({num_ura_indicators} indicator(s))")
         print()
 
     print("Remaining tiles (including zeros)")

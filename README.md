@@ -2,7 +2,7 @@
 
 ## Updates 3/01/2026
 
-- Added **ura-dora prediction** in points mode:
+- Added **ura-dora prediction** in points mode (only when `riichi` is true; no ura is counted when riichi=false):
   - **Ura-dora rate**: proportion of remaining tiles that, when revealed as ura-dora indicators, would give at least 1 ura-dora han.
   - **Expected ura-dora**: expected number of ura-dora han, accounting for multiple copies in hand (e.g., 3×9m with indicator 8m yields 3 ura-dora).
   - Number of ura-dora indicators = 1 + number of kans.

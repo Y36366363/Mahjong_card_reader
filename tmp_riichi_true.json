@@ -1,17 +1,17 @@
 {
   "mode": "points",
-  "hand": "1m 1m 1m 2m 3m 4m 0m 6m 7m 8m 9s 9s 9s",
-  "river": "9p 9p 9p",
+  "hand": "9m 9m 1m 2m 3m 4p 5p 6p 7s 8s 9s E E",
+  "river": "",
   "points": {
     "win_type": "tsumo",
     "win_tile": "9m",
-    "is_dealer": true,
-    "riichi": false,
+    "is_dealer": false,
+    "riichi": true,
     "furo_sets": 0,
     "kan_sets": 0,
     "ankan_tiles": [],
     "kan_tiles": [],
-    "dora": ["5m"],
+    "dora": [],
     "seat_wind": "E",
     "round_wind": "E"
   }
