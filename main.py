@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from points import estimate_points
 from remaining import RemainingTileCounter
 from scoring import score_points_from_config
 from shanten import calculate_shanten_all
@@ -86,6 +87,44 @@ def _compute_ura_dora(hand_counts: list[int], remaining_counts: list[int], num_u
             rate += remaining_counts[i] / total
         expected_per_ind += (remaining_counts[i] / total) * hand_counts[ura_idx]
     return (rate, expected_per_ind * num_ura_indicators)
+
+
+def _compute_ura_dora_distribution(
+    hand_counts: list[int], remaining_counts: list[int], num_ura_indicators: int
+) -> tuple[float, float, float, float, float]:
+    """
+    Returns (P(0 ura), P(1 ura), P(2 ura), P(3 ura), P(4+ ura)).
+    Each ura indicator independently reveals a tile; the ura-dora han from that indicator
+    equals how many of that tile we hold in our hand.
+    """
+    total = sum(remaining_counts)
+    if total <= 0 or num_ura_indicators <= 0:
+        return (1.0, 0.0, 0.0, 0.0, 0.0)
+
+    # Per-indicator distribution: P(han=k) for one indicator
+    single: list[float] = [0.0] * 5  # indices 0..4 for 0..4 han
+    for i in range(34):
+        p = remaining_counts[i] / total
+        ura_idx = _ura_dora_next_idx(i)
+        han = min(hand_counts[ura_idx], 4)
+        single[han] += p
+
+    # Convolve for num_ura_indicators (treat indicators as independent)
+    dist = list(single)
+    for _ in range(num_ura_indicators - 1):
+        new_dist = [0.0] * (len(dist) + 4)
+        for h1 in range(len(dist)):
+            for h2 in range(5):
+                if dist[h1] > 0 and single[h2] > 0:
+                    new_dist[h1 + h2] += dist[h1] * single[h2]
+        dist = new_dist
+
+    p0 = dist[0] if len(dist) > 0 else 0.0
+    p1 = dist[1] if len(dist) > 1 else 0.0
+    p2 = dist[2] if len(dist) > 2 else 0.0
+    p3 = dist[3] if len(dist) > 3 else 0.0
+    p4plus = sum(dist[4:]) if len(dist) > 4 else 0.0
+    return (p0, p1, p2, p3, p4plus)
 
 
 def _draws_to_reach_tenpai(hand13_tiles: list[str]) -> list[str]:
@@ -342,6 +381,40 @@ def main() -> None:
             ura_rate, expected_ura = _compute_ura_dora(hand_counts, remaining_counts, num_ura_indicators)
             print(f"  Ura-dora rate     : {ura_rate:.1%}  (prob. an indicator yields ura-dora)")
             print(f"  Expected ura-dora : {expected_ura:.2f} han  ({num_ura_indicators} indicator(s))")
+
+            # Estimated points (weighted by ura-dora probability) for non-yakuman hands
+            if not sb.yakuman and sb.fu is not None and sb.han >= 1:
+                p0, p1, p2, p3, p4plus = _compute_ura_dora_distribution(
+                    hand_counts, remaining_counts, num_ura_indicators
+                )
+                base_han = sb.han
+                base_fu = sb.fu
+
+                def total_pts(pr: object) -> float:
+                    if getattr(pr, "ron_points", None) is not None:
+                        return float(pr.ron_points)
+                    t = getattr(pr, "tsumo_total_points", None)
+                    return float(t) if t is not None else 0.0
+
+                def expected_points(wt: str) -> float:
+                    def pts(ura: int) -> object:
+                        return estimate_points(
+                            han=base_han + ura,
+                            fu=base_fu,
+                            is_dealer=sb.is_dealer,
+                            win_type=wt,
+                        )
+                    return (
+                        p0 * total_pts(pts(0))
+                        + p1 * total_pts(pts(1))
+                        + p2 * total_pts(pts(2))
+                        + p3 * total_pts(pts(3))
+                        + p4plus * total_pts(pts(4))
+                    )
+
+                est = expected_points(win_type)
+                label = "Estimated Ron" if win_type == "ron" else "Estimated Tsumo"
+                print(f"  {label:16} : {est:.0f} pts  (weighted by ura-dora: P0={p0:.1%}, P1={p1:.1%}, P2={p2:.1%}, P3={p3:.1%}, P4+={p4plus:.1%})")
         print()
 
     print("Remaining tiles (including zeros)")

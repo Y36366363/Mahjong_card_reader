@@ -1,5 +1,12 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 3/02/2026
+
+- Added **estimated points** when `riichi` is true (points mode, non-yakuman hands):
+  - **Estimated Ron** or **Estimated Tsumo** (matches `win_type`) — expected total points weighted by ura-dora probability distribution.
+  - Formula: P(0)×pts(0 ura) + P(1)×pts(1 ura) + P(2)×pts(2 ura) + P(3)×pts(3 ura) + P(4+)×pts(4 ura).
+  - Ura-dora distribution P(0), P(1), P(2), P(3), P(4+) is computed from remaining tile counts and hand composition (e.g., triplets increase P(3) when the ura tile matches).
+
 ## Updates 3/01/2026
 
 - Added **ura-dora prediction** in points mode (only when `riichi` is true; no ura is counted when riichi=false):

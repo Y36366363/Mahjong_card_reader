@@ -3,10 +3,10 @@
   "hand": "1m 1m 1m 2m 3m 4m 0m 6m 7m 8m 9s 9s 9s",
   "river": "9p 9p 9p",
   "points": {
-    "win_type": "tsumo",
+    "win_type": "ron",
     "win_tile": "9m",
     "is_dealer": true,
-    "riichi": false,
+    "riichi": true,
     "furo_sets": 0,
     "kan_sets": 0,
     "ankan_tiles": [],
