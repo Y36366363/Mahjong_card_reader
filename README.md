@@ -10,6 +10,12 @@
   - Furiten never prevents tsumo.
 - The player view now displays all four rivers before every player-controlled discard and shows the current furiten reason when applicable.
 - Game-mode wins continue to use the existing yaku and point calculation system; AI players normally pursue riichi and only open value-honor melds.
+- Improved full-game simulation after two end-to-end East-round test matches:
+  - Riichi hands are now locked and automatically discard every non-winning draw.
+  - Exhaustive draws now exchange the standard 3,000-point tenpai/noten payment.
+  - Open kans now draw a replacement tile, shorten the live wall, and reveal an additional dora indicator.
+  - Discards made immediately after chi/pon/kan now go through the normal multi-ron and furiten checks.
+  - `--auto-game` no longer prints the player hand and all rivers every turn, greatly reducing simulation output.
 
 ## Updates 3/02/2026
 

@@ -71,6 +71,7 @@ class MahjongGame:
         self.wall: list[str] = []
         self.dead_wall: list[str] = []
         self.dora_indicators: list[str] = []
+        self._call_win_dealer_continues: bool | None = None
 
     def play(self) -> None:
         print(f"East-round game started (seed={self.seed!r}).")
@@ -96,6 +97,7 @@ class MahjongGame:
 
     def _play_hand(self) -> bool:
         self._new_wall()
+        self._call_win_dealer_continues = None
         for p in self.players:
             p.hand.clear(); p.melds.clear(); p.river.clear(); p.riichi = False
             p.temporary_furiten = False; p.riichi_furiten = False
@@ -119,49 +121,39 @@ class MahjongGame:
             if score and (turn != 0 or self._yes_no(f"Tsumo {draw} for {self._score_label(score)}?", True)):
                 self._settle_tsumo(turn, score)
                 return turn == self.dealer
-            if turn == 0:
+            if turn == 0 and self.interactive:
                 self._show_state(draw)
-            discard = self._choose_discard(turn)
+            # After riichi the hand is locked: if the draw is not a winning tile,
+            # the drawn tile must be discarded unchanged.
+            discard = draw if p.riichi else self._choose_discard(turn)
             p.hand.remove(discard); p.river.append(discard)
-            if turn == 0:
+            if turn == 0 and self.interactive:
                 print(f"You discarded {discard}.")
 
-            winners = []
-            for other in range(4):
-                if other == turn:
-                    continue
-                score = self._try_score(other, discard, "ron")
-                if not score:
-                    continue
-                if self._is_furiten(other):
-                    if other == 0:
-                        print(f"Ron on {discard} is unavailable: you are furiten.")
-                    continue
-                accepted = other != 0 or self._yes_no(
-                    f"Ron on {discard} for {self._score_label(score)}?", True
-                )
-                if accepted:
-                    winners.append((other, score))
-                else:
-                    missed = self.players[other]
-                    if missed.riichi:
-                        missed.riichi_furiten = True
-                        print("You passed ron after riichi: furiten lasts until this hand ends.")
-                    else:
-                        missed.temporary_furiten = True
-                        print("You passed ron: temporary furiten lasts until your next draw.")
-            if winners:
-                self._settle_ron(turn, winners)
-                return any(w == self.dealer for w, _ in winners)
+            ron_result = self._resolve_ron(turn, discard)
+            if ron_result is not None:
+                return ron_result
 
             caller = self._offer_calls(turn, discard)
+            if self._call_win_dealer_continues is not None:
+                return self._call_win_dealer_continues
             if caller is not None:
                 turn = caller
             else:
                 turn = (turn + 1) % 4
 
         print("Exhaustive draw. Dealer continues only if tenpai.")
-        dealer_tenpai = self._standard_shanten(self.players[self.dealer]) == 0
+        tenpai = [i for i, player in enumerate(self.players) if self._standard_shanten(player) == 0]
+        noten = [i for i in range(4) if i not in tenpai]
+        if tenpai and noten:
+            gain = 3000 // len(tenpai)
+            loss = 3000 // len(noten)
+            for i in tenpai:
+                self.players[i].points += gain
+            for i in noten:
+                self.players[i].points -= loss
+            print("Tenpai payment: " + ", ".join(self.players[i].name for i in tenpai) + " receive 3000 total.")
+        dealer_tenpai = self.dealer in tenpai
         return dealer_tenpai
 
     def _full_for_analysis(self, p: PlayerState, extra: str | None = None) -> list[str]:
@@ -181,7 +173,9 @@ class MahjongGame:
         # Ron tile is not in hand; a tsumo tile already is and must be removed once.
         if win_type == "tsumo":
             concealed.remove(win_tile)
-        open_melds = [m for m in p.melds if m.open]
+        open_melds = [m for m in p.melds if m.open and m.kind != "kan"] + [
+            m for m in p.melds if m.open and m.kind == "kan"
+        ]
         closed_kans = [m for m in p.melds if not m.open and m.kind == "kan"]
         ordered = concealed.copy()
         for m in open_melds:
@@ -215,6 +209,37 @@ class MahjongGame:
             if self._try_score(seat, tile, "ron") is not None:
                 waits.add(tile)
         return waits
+
+    def _resolve_ron(self, discarder: int, discard: str) -> bool | None:
+        """Resolve every legal ron on a discard; return dealer continuation if won."""
+        winners: list[tuple[int, ScoreBreakdown]] = []
+        for other in range(4):
+            if other == discarder:
+                continue
+            score = self._try_score(other, discard, "ron")
+            if not score:
+                continue
+            if self._is_furiten(other):
+                if other == 0:
+                    print(f"Ron on {discard} is unavailable: you are furiten.")
+                continue
+            accepted = other != 0 or self._yes_no(
+                f"Ron on {discard} for {self._score_label(score)}?", True
+            )
+            if accepted:
+                winners.append((other, score))
+            else:
+                missed = self.players[other]
+                if missed.riichi:
+                    missed.riichi_furiten = True
+                    print("You passed ron after riichi: furiten lasts until this hand ends.")
+                else:
+                    missed.temporary_furiten = True
+                    print("You passed ron: temporary furiten lasts until your next draw.")
+        if not winners:
+            return None
+        self._settle_ron(discarder, winners)
+        return any(winner == self.dealer for winner, _ in winners)
 
     def _discard_furiten(self, seat: int) -> bool:
         p = self.players[seat]
@@ -300,9 +325,36 @@ class MahjongGame:
                 for x in needed: p.hand.remove(x)
                 p.melds.append(MeldState(kind, meld_tiles)); p.sort()
                 print(f"{p.name} calls {kind} on {tile}.")
+                if kind == "kan":
+                    # Daiminkan receives a replacement tile from the dead wall and
+                    # reveals another dora indicator. The live wall is shortened by
+                    # one so the total number of drawable tiles stays correct.
+                    replacement = self.dead_wall.pop()
+                    p.hand.append(replacement); p.sort()
+                    if self.wall:
+                        self.wall.pop()
+                    indicator_pos = 4 + 2 * len(self.dora_indicators)
+                    if indicator_pos < len(self.dead_wall):
+                        self.dora_indicators.append(self.dead_wall[indicator_pos])
+                    print(f"{p.name} draws a replacement tile; dora is now " +
+                          " ".join(dora_from_indicator(x) for x in self.dora_indicators) + ".")
+                    rinshan_score = self._try_score(caller, replacement, "tsumo")
+                    accepts = rinshan_score and (
+                        caller != 0 or self._yes_no(
+                            f"Tsumo after kan for {self._score_label(rinshan_score)}?", True
+                        )
+                    )
+                    if rinshan_score and accepts:
+                        self._settle_tsumo(caller, rinshan_score)
+                        self._call_win_dealer_continues = caller == self.dealer
+                        return None
                 discard = self._choose_discard(caller)
                 p.hand.remove(discard); p.river.append(discard)
                 print(f"{p.name} discarded {discard}.")
+                ron_result = self._resolve_ron(caller, discard)
+                if ron_result is not None:
+                    self._call_win_dealer_continues = ron_result
+                    return None
                 # Calling consumes the caller's normal draw; after its immediate
                 # discard, play advances to the following seat.
                 return (caller + 1) % 4
