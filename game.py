@@ -40,6 +40,8 @@ class PlayerState:
     melds: list[MeldState] = field(default_factory=list)
     river: list[str] = field(default_factory=list)
     riichi: bool = False
+    temporary_furiten: bool = False
+    riichi_furiten: bool = False
 
     def sort(self) -> None:
         self.hand.sort(key=tile_sort_key)
@@ -96,6 +98,7 @@ class MahjongGame:
         self._new_wall()
         for p in self.players:
             p.hand.clear(); p.melds.clear(); p.river.clear(); p.riichi = False
+            p.temporary_furiten = False; p.riichi_furiten = False
         for _ in range(13):
             for offset in range(4):
                 self.players[(self.dealer + offset) % 4].hand.append(self.wall.pop(0))
@@ -107,6 +110,9 @@ class MahjongGame:
         turn = self.dealer
         while self.wall:
             p = self.players[turn]
+            # Same-turn furiten ends on this player's next normal draw. A missed
+            # ron after riichi is stored separately and lasts for the whole hand.
+            p.temporary_furiten = False
             draw = self.wall.pop(0)
             p.hand.append(draw); p.sort()
             score = self._try_score(turn, draw, "tsumo")
@@ -125,8 +131,25 @@ class MahjongGame:
                 if other == turn:
                     continue
                 score = self._try_score(other, discard, "ron")
-                if score and (other != 0 or self._yes_no(f"Ron on {discard} for {self._score_label(score)}?", True)):
+                if not score:
+                    continue
+                if self._is_furiten(other):
+                    if other == 0:
+                        print(f"Ron on {discard} is unavailable: you are furiten.")
+                    continue
+                accepted = other != 0 or self._yes_no(
+                    f"Ron on {discard} for {self._score_label(score)}?", True
+                )
+                if accepted:
                     winners.append((other, score))
+                else:
+                    missed = self.players[other]
+                    if missed.riichi:
+                        missed.riichi_furiten = True
+                        print("You passed ron after riichi: furiten lasts until this hand ends.")
+                    else:
+                        missed.temporary_furiten = True
+                        print("You passed ron: temporary furiten lasts until your next draw.")
             if winners:
                 self._settle_ron(turn, winners)
                 return any(w == self.dealer for w, _ in winners)
@@ -179,6 +202,28 @@ class MahjongGame:
             return score_points_from_config(**self._score_args(seat, tile, win_type))
         except (ValueError, IndexError):
             return None
+
+    def _ron_waits(self, seat: int) -> set[str]:
+        """Return the tiles this player can legally ron on, ignoring furiten."""
+        p = self.players[seat]
+        visible = tiles_to_counts(self._full_for_analysis(p))
+        waits: set[str] = set()
+        for i in range(34):
+            if visible[i] >= 4:
+                continue
+            tile = index_to_tile(i)
+            if self._try_score(seat, tile, "ron") is not None:
+                waits.add(tile)
+        return waits
+
+    def _discard_furiten(self, seat: int) -> bool:
+        p = self.players[seat]
+        waits = self._ron_waits(seat)
+        return bool(waits.intersection(p.river))
+
+    def _is_furiten(self, seat: int) -> bool:
+        p = self.players[seat]
+        return p.temporary_furiten or p.riichi_furiten or self._discard_furiten(seat)
 
     def _choose_discard(self, seat: int) -> str:
         p = self.players[seat]
@@ -268,6 +313,17 @@ class MahjongGame:
         print(f"\nWall: {len(self.wall)} | Scores: " + ", ".join(f"{x.name} {x.points}" for x in self.players))
         print("Your hand: " + " ".join(f"{i + 1}:{t}" for i, t in enumerate(p.hand)))
         print(f"Draw: {draw} | Shanten: {self._standard_shanten(p)}")
+        print("Rivers:")
+        for i, player in enumerate(self.players):
+            marker = " (dealer)" if i == self.dealer else ""
+            river = " ".join(player.river) if player.river else "(empty)"
+            print(f"  {player.name}{marker}: {river}")
+        if self._is_furiten(0):
+            reasons: list[str] = []
+            if self._discard_furiten(0): reasons.append("own-discard")
+            if p.temporary_furiten: reasons.append("temporary")
+            if p.riichi_furiten: reasons.append("riichi missed-ron")
+            print(f"Furiten: YES ({', '.join(reasons)})")
         if p.melds:
             print("Melds: " + " / ".join(f"{m.kind}({' '.join(m.tiles)})" for m in p.melds))
 

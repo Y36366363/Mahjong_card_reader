@@ -1,5 +1,16 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/12/2026
+
+- Added an interactive **East-round game simulation** with four players, fixed walls after each hand's initial shuffle, dealer continuations, honba, riichi sticks, early bankruptcy settlement, and final ranking.
+- Added **furiten rules** in game mode:
+  - A player cannot ron when any current winning tile appears in their own river.
+  - Passing a valid ron causes temporary furiten until the player's next draw.
+  - Passing ron after riichi causes furiten for the rest of the hand.
+  - Furiten never prevents tsumo.
+- The player view now displays all four rivers before every player-controlled discard and shows the current furiten reason when applicable.
+- Game-mode wins continue to use the existing yaku and point calculation system; AI players normally pursue riichi and only open value-honor melds.
+
 ## Updates 3/02/2026
 
 - Added **estimated points** when `riichi` is true (points mode, non-yakuman hands):
@@ -77,6 +88,11 @@ draws, and immediate termination when any score falls below zero. The three AIs
 minimize standard-hand shanten and normally remain closed for riichi; they only
 open value-honor pon/kan, so they do not claim a no-yaku win. Scoring is delegated
 to the existing scoring module.
+
+Game mode enforces discard furiten, temporary furiten after passing ron, and
+permanent-for-the-hand furiten after passing ron while in riichi. Furiten blocks
+ron but not tsumo. Before each of your discards, all four players' rivers are
+shown along with your current furiten status.
 
 Notes/assumptions for `points` mode (current implementation):
 - Hands are treated as **closed (menzen)**.
