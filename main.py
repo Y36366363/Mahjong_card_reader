@@ -198,6 +198,12 @@ def main() -> None:
     )
     ap.add_argument("--seed", type=int, default=None, help="Game mode: reproducible wall seed")
     ap.add_argument("--auto-game", action="store_true", help="Game mode: let AI control all four seats")
+    ap.add_argument(
+        "--ai-levels",
+        type=str,
+        default=None,
+        help="Game mode: four comma-separated AI levels (simple/advanced)",
+    )
     args = ap.parse_args()
 
     config: dict[str, Any] = {}
@@ -220,7 +226,19 @@ def main() -> None:
     if mode == "game":
         game_cfg = config.get("game", {})
         seed = args.seed if args.seed is not None else game_cfg.get("seed")
-        MahjongGame(seed=seed, interactive=not args.auto_game).play()
+        levels_value = args.ai_levels if args.ai_levels is not None else game_cfg.get("ai_levels")
+        levels = None
+        if levels_value:
+            if isinstance(levels_value, str):
+                levels = [x.strip().lower() for x in levels_value.split(",")]
+            elif isinstance(levels_value, list):
+                levels = [str(x).strip().lower() for x in levels_value]
+            else:
+                ap.error("game.ai_levels must be a comma-separated string or list.")
+        try:
+            MahjongGame(seed=seed, interactive=not args.auto_game, ai_levels=levels).play()
+        except ValueError as e:
+            ap.error(str(e))
         return
 
     hand_value = args.hand if args.hand is not None else config.get("hand")

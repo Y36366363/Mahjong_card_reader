@@ -59,6 +59,15 @@ def shanten_standard(counts: list[int]) -> int:
     return _shanten_standard_general(tuple(counts))
 
 
+def shanten_standard_draw_state(counts: list[int]) -> int:
+    """Evaluate a drawn 14-tile state without trying every possible discard.
+
+    This is useful for fast ukeire checks: a draw is effective when this value is
+    lower than the shanten of the original 13-tile state.
+    """
+    return _shanten_standard_general(tuple(counts))
+
+
 @lru_cache(maxsize=200_000)
 def _shanten_standard_general(counts_t: tuple[int, ...]) -> int:
     best = 8
@@ -144,4 +153,3 @@ def _shanten_standard_general(counts_t: tuple[int, ...]) -> int:
 
     dfs(counts_t, 0, 0, 0)
     return best
-

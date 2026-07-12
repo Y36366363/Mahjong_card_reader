@@ -4,7 +4,7 @@ import random
 from dataclasses import dataclass, field
 
 from scoring import ScoreBreakdown, score_points_from_config
-from shanten import shanten_standard
+from shanten import shanten_standard, shanten_standard_draw_state
 from tiles import index_to_tile, tile_to_index, tiles_to_counts
 
 
@@ -35,6 +35,7 @@ class MeldState:
 @dataclass
 class PlayerState:
     name: str
+    ai_level: str = "simple"
     points: int = 25_000
     hand: list[str] = field(default_factory=list)
     melds: list[MeldState] = field(default_factory=list)
@@ -59,11 +60,23 @@ class MahjongGame:
     hand.
     """
 
-    def __init__(self, *, seed: int | None = None, interactive: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        seed: int | None = None,
+        interactive: bool = True,
+        ai_levels: list[str] | None = None,
+    ) -> None:
         self.rng = random.Random(seed)
         self.seed = seed
         self.interactive = interactive
-        self.players = [PlayerState("You"), PlayerState("AI-1"), PlayerState("AI-2"), PlayerState("AI-3")]
+        levels = ai_levels or ["simple"] * 4
+        if len(levels) != 4 or any(level not in {"simple", "advanced"} for level in levels):
+            raise ValueError("ai_levels must contain four values: simple or advanced.")
+        self.players = [
+            PlayerState(name, ai_level=level)
+            for name, level in zip(("You", "AI-1", "AI-2", "AI-3"), levels)
+        ]
         self.dealer = 0
         self.round_hand = 0
         self.honba = 0
@@ -74,7 +87,8 @@ class MahjongGame:
         self._call_win_dealer_continues: bool | None = None
 
     def play(self) -> None:
-        print(f"East-round game started (seed={self.seed!r}).")
+        levels = ", ".join(f"{p.name}={p.ai_level}" for p in self.players)
+        print(f"East-round game started (seed={self.seed!r}; {levels}).")
         while self.round_hand < 4 and all(p.points > 0 for p in self.players):
             dealer_continues = self._play_hand()
             if dealer_continues:
@@ -267,17 +281,12 @@ class MahjongGame:
                 if raw in p.hand:
                     return raw
                 print("That tile is not in your hand.")
-        best: list[str] = []
-        best_shanten = 99
-        for tile in sorted(set(p.hand), key=tile_sort_key):
-            p.hand.remove(tile)
-            sh = self._standard_shanten(p)
-            p.hand.append(tile); p.sort()
-            if sh < best_shanten:
-                best_shanten, best = sh, [tile]
-            elif sh == best_shanten:
-                best.append(tile)
-        discard = best[0]
+        if p.ai_level == "advanced":
+            discard = self._choose_advanced_discard(seat)
+            best_shanten = self._shanten_after_discard(p, discard)
+        else:
+            discard, best_shanten = self._choose_simple_discard(p)
+
         # Closed AI declares riichi at tenpai. This both supplies a yaku and makes
         # its later discard behaviour deterministic.
         p.hand.remove(discard)
@@ -290,6 +299,128 @@ class MahjongGame:
             print(f"{p.name} declares riichi.")
         p.hand.append(discard); p.sort()
         return discard
+
+    def _choose_simple_discard(self, p: PlayerState) -> tuple[str, int]:
+        best: list[str] = []
+        best_shanten = 99
+        for tile in sorted(set(p.hand), key=tile_sort_key):
+            p.hand.remove(tile)
+            sh = self._standard_shanten(p)
+            p.hand.append(tile); p.sort()
+            if sh < best_shanten:
+                best_shanten, best = sh, [tile]
+            elif sh == best_shanten:
+                best.append(tile)
+        return best[0], best_shanten
+
+    def _shanten_after_discard(self, p: PlayerState, tile: str) -> int:
+        p.hand.remove(tile)
+        sh = self._standard_shanten(p)
+        p.hand.append(tile); p.sort()
+        return sh
+
+    def _visible_counts(self, seat: int) -> list[int]:
+        visible = self.players[seat].hand.copy()
+        for player in self.players:
+            visible.extend(player.river)
+            for meld in player.melds:
+                visible.extend(meld.tiles)
+        return tiles_to_counts(visible)
+
+    def _ukeire(self, p: PlayerState, visible: list[int]) -> tuple[int, int]:
+        current = self._standard_shanten(p)
+        base_counts = tiles_to_counts(self._full_for_analysis(p))
+        kinds = total = 0
+        for i in range(34):
+            left = max(0, 4 - visible[i])
+            if not left:
+                continue
+            drawn = base_counts.copy(); drawn[i] += 1
+            improves = shanten_standard_draw_state(drawn) < current
+            if improves:
+                kinds += 1; total += left
+        return kinds, total
+
+    def _tile_value(self, seat: int, tile: str) -> float:
+        p = self.players[seat]
+        value = 0.0
+        if tile in {dora_from_indicator(x) for x in self.dora_indicators}:
+            value += 6.0
+        seat_wind = WINDS[(seat - self.dealer) % 4]
+        if tile in {"P", "F", "C", "E", seat_wind}:
+            value += 2.0 + min(2, p.hand.count(tile))
+        i = tile_to_index(tile)
+        if i < 27:
+            pos = i % 9
+            counts = tiles_to_counts(p.hand)
+            for delta in (-2, -1, 1, 2):
+                j = i + delta
+                if 0 <= j < 27 and j // 9 == i // 9 and counts[j]:
+                    value += 0.5 if abs(delta) == 2 else 1.0
+            if pos in {0, 8}:
+                value -= 0.3
+        return value
+
+    def _defense_risk(self, seat: int, tile: str, threats: list[int], visible: list[int]) -> float:
+        if not threats:
+            return 0.0
+        i = tile_to_index(tile)
+        risk = 0.0
+        for opponent in threats:
+            river = self.players[opponent].river
+            if tile in river:  # genbutsu
+                continue
+            one = 5.0
+            if i >= 27:
+                one = max(0.3, 3.2 - visible[i])  # exhausted honors become safer
+            else:
+                pos = i % 9
+                river_pos = {tile_to_index(x) % 9 for x in river if tile_to_index(x) // 9 == i // 9}
+                # Basic suji: 1/4/7, 2/5/8, 3/6/9 relationships.
+                if any(abs(pos - r) == 3 for r in river_pos):
+                    one -= 2.0
+                # A complete adjacent wall reduces sequence danger.
+                neighbors = [j for j in (i - 1, i + 1) if 0 <= j < 27 and j // 9 == i // 9]
+                if any(visible[j] >= 4 for j in neighbors):
+                    one -= 1.2
+            risk += max(0.1, one)
+        return risk
+
+    def _choose_advanced_discard(self, seat: int) -> str:
+        p = self.players[seat]
+        visible = self._visible_counts(seat)
+        threats = [i for i, other in enumerate(self.players) if i != seat and other.riichi]
+        rank = 1 + sum(other.points > p.points for other in self.players)
+        shanten_by_tile = {
+            tile: self._shanten_after_discard(p, tile)
+            for tile in sorted(set(p.hand), key=tile_sort_key)
+        }
+        best_shanten = min(shanten_by_tile.values())
+        fold = bool(threats) and (best_shanten >= 2 or (rank == 1 and best_shanten >= 1))
+        if fold:
+            return min(
+                shanten_by_tile,
+                key=lambda tile: (
+                    self._defense_risk(seat, tile, threats, visible),
+                    shanten_by_tile[tile],
+                    self._tile_value(seat, tile),
+                    tile_to_index(tile),
+                ),
+            )
+
+        # Ukeire is the expensive part of evaluation. Only equal-best-shanten
+        # discards can win, so avoid evaluating candidates that are already slower.
+        shortlist = [tile for tile, sh in shanten_by_tile.items() if sh == best_shanten]
+        candidates: list[tuple[tuple[float, ...], str]] = []
+        for tile in shortlist:
+            p.hand.remove(tile)
+            kinds, total = self._ukeire(p, visible)
+            p.hand.append(tile); p.sort()
+            risk = self._defense_risk(seat, tile, threats, visible)
+            value = self._tile_value(seat, tile)
+            key = (-float(total), -float(kinds), risk * 0.35, value, float(tile_to_index(tile)))
+            candidates.append((key, tile))
+        return min(candidates)[1]
 
     def _call_options(self, caller: int, discarder: int, tile: str) -> list[tuple[str, list[str]]]:
         p = self.players[caller]
@@ -325,7 +456,9 @@ class MahjongGame:
                     chosen = opts[int(raw) - 1]
             elif caller != 0 or not self.interactive:
                 seat_wind = WINDS[(caller - self.dealer) % 4]
-                if tile in {"P", "F", "C", "E", seat_wind}:
+                if self.players[caller].ai_level == "advanced":
+                    chosen = self._advanced_call_choice(caller, tile, opts)
+                elif tile in {"P", "F", "C", "E", seat_wind}:
                     chosen = next((o for o in reversed(opts) if o[0] in {"pon", "kan"}), None)
             if chosen:
                 kind, meld_tiles = chosen
@@ -368,6 +501,49 @@ class MahjongGame:
                 # discard, play advances to the following seat.
                 return (caller + 1) % 4
         return None
+
+    def _advanced_call_choice(
+        self, caller: int, tile: str, opts: list[tuple[str, list[str]]]
+    ) -> tuple[str, list[str]] | None:
+        """Conservative, deterministic call policy for the advanced AI."""
+        if not opts:
+            return None
+        p = self.players[caller]
+        if p.riichi:
+            return None
+        threats = any(i != caller and other.riichi for i, other in enumerate(self.players))
+        rank = 1 + sum(other.points > p.points for other in self.players)
+        before_shanten = self._standard_shanten(p)
+        before_visible = self._visible_counts(caller)
+        before_ukeire = self._ukeire(p, before_visible)[1]
+        seat_wind = WINDS[(caller - self.dealer) % 4]
+        value_honor = tile in {"P", "F", "C", "E", seat_wind}
+        choices: list[tuple[tuple[int, int, int], tuple[str, list[str]]]] = []
+        for option in opts:
+            kind, meld_tiles = option
+            # Opening without a known yaku is deliberately avoided. This keeps
+            # tanyao/flush speculation from creating no-yaku hands.
+            if not value_honor:
+                continue
+            if kind == "kan" and (threats or rank == 1 or len(self.wall) <= 12):
+                continue
+            needed = meld_tiles.copy(); needed.remove(tile)
+            for x in needed:
+                p.hand.remove(x)
+            p.melds.append(MeldState(kind, meld_tiles))
+            after_shanten = self._standard_shanten(p)
+            after_visible = self._visible_counts(caller)
+            after_ukeire = self._ukeire(p, after_visible)[1]
+            p.melds.pop()
+            p.hand.extend(needed); p.sort()
+            # Do not call if it makes the hand slower. Near tenpai, require the
+            # remaining improvement count not to collapse too severely.
+            if after_shanten > before_shanten:
+                continue
+            if before_shanten <= 1 and after_ukeire * 2 < before_ukeire:
+                continue
+            choices.append(((after_shanten, -after_ukeire, 1 if kind == "kan" else 0), option))
+        return min(choices, default=((), None))[1]
 
     def _show_state(self, draw: str) -> None:
         p = self.players[0]

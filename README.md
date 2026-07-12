@@ -10,6 +10,7 @@
   - Furiten never prevents tsumo.
 - The player view now displays all four rivers before every player-controlled discard and shows the current furiten reason when applicable.
 - Game-mode wins continue to use the existing yaku and point calculation system; AI players normally pursue riichi and only open value-honor melds.
+- Preserved the original shanten-only policy as **simple AI** and added an **advanced AI** that evaluates remaining improvements, wait breadth, dora and value-honor retention, genbutsu, suji, walls, honor safety, score/rank-based folding, and conservative call/kan value.
 - Improved full-game simulation after two end-to-end East-round test matches:
   - Riichi hands are now locked and automatically discard every non-winning draw.
   - Exhaustive draws now exchange the standard 3,000-point tenpai/noten payment.
@@ -86,6 +87,19 @@ Start an interactive game (you are always `You`; enter a tile or its displayed i
 
 ```bash
 python main.py --mode game --seed 2026
+```
+
+Choose the four computer levels in seat order (`You,AI-1,AI-2,AI-3`):
+
+```bash
+python main.py --mode game --auto-game --seed 2026 \
+  --ai-levels advanced,simple,advanced,simple
+```
+
+Run the deterministic AI regression tests with:
+
+```bash
+python -m unittest test_game_ai.py
 ```
 
 Use `--auto-game` for a hands-off smoke test. A wall is shuffled once at the start
