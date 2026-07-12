@@ -16,6 +16,8 @@
   - Open kans now draw a replacement tile, shorten the live wall, and reveal an additional dora indicator.
   - Discards made immediately after chi/pon/kan now go through the normal multi-ron and furiten checks.
   - `--auto-game` no longer prints the player hand and all rivers every turn, greatly reducing simulation output.
+  - In `--auto-game`, the `You` seat now uses the same riichi and value-honor call policy as the other three AIs, making batch comparisons fair.
+  - Any unclaimed riichi sticks at the end of the match are awarded to the current first-place player, preserving the 100,000-point total.
 
 ## Updates 3/02/2026
 

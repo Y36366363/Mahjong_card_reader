@@ -83,6 +83,13 @@ class MahjongGame:
                 self.dealer = (self.dealer + 1) % 4
                 self.round_hand += 1
                 self.honba = 0
+        # If the match ends with unclaimed riichi sticks, award them to the current
+        # first-place player so the final player scores still total 100,000.
+        if self.riichi_sticks:
+            leader = max(range(4), key=lambda i: (self.players[i].points, -i))
+            self.players[leader].points += self.riichi_sticks * 1000
+            print(f"Unclaimed riichi sticks ({self.riichi_sticks}) go to {self.players[leader].name}.")
+            self.riichi_sticks = 0
         print("\nFinal ranking")
         ranked = sorted(enumerate(self.players), key=lambda x: (-x[1].points, x[0]))
         for rank, (_, p) in enumerate(ranked, 1):
@@ -275,7 +282,9 @@ class MahjongGame:
         # its later discard behaviour deterministic.
         p.hand.remove(discard)
         can_riichi = best_shanten == 0 and p.is_closed and not p.riichi and p.points >= 1000
-        declare = can_riichi and (seat != 0 or self._yes_no("Declare riichi?", False))
+        declare = can_riichi and (
+            seat != 0 or not self.interactive or self._yes_no("Declare riichi?", False)
+        )
         if declare:
             p.riichi = True; p.points -= 1000; self.riichi_sticks += 1
             print(f"{p.name} declares riichi.")
@@ -314,7 +323,7 @@ class MahjongGame:
                 raw = input("Call? 0:pass, " + ", ".join(labels) + " > ").strip()
                 if raw.isdigit() and 1 <= int(raw) <= len(opts):
                     chosen = opts[int(raw) - 1]
-            elif caller != 0:
+            elif caller != 0 or not self.interactive:
                 seat_wind = WINDS[(caller - self.dealer) % 4]
                 if tile in {"P", "F", "C", "E", seat_wind}:
                     chosen = next((o for o in reversed(opts) if o[0] in {"pon", "kan"}), None)
