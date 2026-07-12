@@ -11,6 +11,7 @@ from scoring import score_points_from_config
 from shanten import calculate_shanten_all
 from tenpai import tenpai_waits_for_13
 from tiles import index_to_tile, parse_tiles, tile_to_index, tiles_to_counts
+from game import MahjongGame
 
 
 def _load_config(path: Path) -> dict[str, Any]:
@@ -179,7 +180,7 @@ def main() -> None:
     ap.add_argument(
         "--mode",
         type=str,
-        choices=["tenpai", "points"],
+        choices=["tenpai", "points", "game"],
         default=None,
         help="Run mode. Overrides config 'mode' if set.",
     )
@@ -195,6 +196,8 @@ def main() -> None:
         default=None,
         help="River/discards tiles, space-separated (can also be set in config)",
     )
+    ap.add_argument("--seed", type=int, default=None, help="Game mode: reproducible wall seed")
+    ap.add_argument("--auto-game", action="store_true", help="Game mode: let AI control all four seats")
     args = ap.parse_args()
 
     config: dict[str, Any] = {}
@@ -211,8 +214,14 @@ def main() -> None:
             ap.error(str(e))
 
     mode = args.mode if args.mode is not None else str(config.get("mode", "tenpai")).strip().lower()
-    if mode not in {"tenpai", "points"}:
-        ap.error("Config field 'mode' must be one of: tenpai, points")
+    if mode not in {"tenpai", "points", "game"}:
+        ap.error("Config field 'mode' must be one of: tenpai, points, game")
+
+    if mode == "game":
+        game_cfg = config.get("game", {})
+        seed = args.seed if args.seed is not None else game_cfg.get("seed")
+        MahjongGame(seed=seed, interactive=not args.auto_game).play()
+        return
 
     hand_value = args.hand if args.hand is not None else config.get("hand")
     hand_str = _tiles_field_to_str(hand_value, field_name="hand")
@@ -423,4 +432,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

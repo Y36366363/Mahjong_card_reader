@@ -59,6 +59,24 @@ It also tracks remaining tile counts (tiles unseen in your hand + river).
   - `points.win_tile` (the winning tile)
   - `points.win_type` (`"ron"` or `"tsumo"`)
   - optional: dora / riichi / ankan
+- **`game`**: play a complete East-round simulation against three shanten-driven AIs.
+
+## East-round simulation
+
+Start an interactive game (you are always `You`; enter a tile or its displayed index):
+
+```bash
+python main.py --mode game --seed 2026
+```
+
+Use `--auto-game` for a hands-off smoke test. A wall is shuffled once at the start
+of each hand and is deterministic thereafter; the same seed plus the same choices
+replays the same walls. The match uses 25,000 starting points, East 1 through East
+4, dealer continuations, honba, riichi sticks, ron/tsumo settlement, exhaustive
+draws, and immediate termination when any score falls below zero. The three AIs
+minimize standard-hand shanten and normally remain closed for riichi; they only
+open value-honor pon/kan, so they do not claim a no-yaku win. Scoring is delegated
+to the existing scoring module.
 
 Notes/assumptions for `points` mode (current implementation):
 - Hands are treated as **closed (menzen)**.
@@ -191,4 +209,3 @@ python main.py -c my_config.toml
 - Dragons: `P F C` (white/green/red)
 
 Red fives are accepted as `0m 0p 0s` and are treated as normal 5s for shanten/counting.
-
