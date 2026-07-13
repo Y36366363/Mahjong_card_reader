@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass, field
 
 from remaining import RemainingTileCounter
@@ -88,9 +89,12 @@ class MahjongGame:
         self.seed = seed
         self.interactive = interactive
         language = language.strip().lower()
-        language = {"chinese": "zh", "中文": "zh", "english": "en", "英文": "en"}.get(language, language)
-        if language not in {"en", "zh"}:
-            raise ValueError("language must be en or zh.")
+        language = {
+            "chinese": "zh", "中文": "zh", "english": "en", "英文": "en",
+            "japanese": "ja", "日本語": "ja", "日语": "ja",
+        }.get(language, language)
+        if language not in {"en", "zh", "ja"}:
+            raise ValueError("language must be en, zh, or ja.")
         self.language = language
         if assist_mode not in {None, "normal", "hint"}:
             raise ValueError("assist_mode must be normal or hint.")
@@ -111,18 +115,108 @@ class MahjongGame:
         self.dora_indicators: list[str] = []
         self._call_win_dealer_continues: bool | None = None
 
-    def _t(self, en: str, zh: str) -> str:
-        return zh if self.language == "zh" else en
+    def _t(self, en: str, zh: str, ja: str | None = None) -> str:
+        if self.language == "en":
+            return en
+        if self.language == "zh":
+            return zh
+        if ja is not None:
+            return ja
+        return self._ja_from_zh(zh)
+
+    @staticmethod
+    def _ja_from_zh(text: str) -> str:
+        """Translate the compact game UI strings while preserving tiles/numbers."""
+        exact = {
+            "\n最终排名": "\n最終順位", "\n最终统计": "\n最終統計",
+            "  玩家    小局 和牌 荣和 自摸 放铳 立直 吃 碰 杠":
+                "  プレイヤー 局数 和了 ロン ツモ 放銃 リーチ チー ポン カン",
+            "选择游戏模式：": "ゲームモードを選択してください：",
+            "  1. 普通模式": "  1. 通常モード",
+            "  2. 提示模式（向听、推荐弃牌、记牌器）": "  2. ヒントモード（シャンテン数・推奨打牌・牌カウンター）",
+            "请输入 1 或 2。": "1 または 2 を入力してください。",
+            "按回车进入下一局……": "Enterキーで次局へ進みます……",
+            "流局。庄家听牌时连庄。": "流局。親がテンパイなら連荘です。",
+            "\n本局结算": "\n局の精算", "玩家状态：": "プレイヤー状態：",
+            "牌河：": "河：", "提示：": "ヒント：",
+            "  记牌器（从你的视角推算剩余）：": "  牌カウンター（自分視点の推定残り枚数）：",
+            "请输入是或否。": "はい、またはいいえを入力してください。",
+            "选择无效。": "無効な選択です。", "  0. 跳过": "  0. パス",
+            "该牌不在你的手牌中。": "その牌は手牌にありません。",
+            "（空）": "（なし）",
+        }
+        if text in exact:
+            return exact[text]
+        patterns = (
+            (r"^(.+)宣布立直。$", r"\1がリーチを宣言しました。"),
+            (r"^(.+)对 (.+) 宣布吃。$", r"\1が \2 をチーしました。"),
+            (r"^(.+)对 (.+) 宣布碰。$", r"\1が \2 をポンしました。"),
+            (r"^(.+)对 (.+) 宣布杠。$", r"\1が \2 をカンしました。"),
+            (r"^(.+)打出了 (.+)。$", r"\1の打牌：\2。"),
+            (r"^(.+)荣和：(.+)，放铳者为(.+)。$", r"\1のロン：\2、放銃者は\3。"),
+            (r"^(.+)自摸：(.+)。$", r"\1のツモ：\2。"),
+            (r"^听牌罚符：(.+)合计获得3000点。$", r"ノーテン罰符：\1が合計3000点を受け取ります。"),
+            (r"^未领取的立直棒（(.+)根）归当前第一名(.+)。$", r"未供託のリーチ棒（\1本）は現在1位の\2が受け取ります。"),
+            (r"^你打出了 (.+)。$", r"あなたの打牌：\1。"),
+            (r"^可以吃 (.+)：$", r"\1 をチーできます："),
+            (r"^是否杠 (.+)？$", r"\1 をカンしますか？"),
+            (r"^是否碰 (.+)？$", r"\1 をポンしますか？"),
+            (r"^是否荣和 (.+)（(.+)）？$", r"\1 でロンしますか（\2）？"),
+            (r"^是否自摸 (.+)（(.+)）？$", r"\1 でツモ和了しますか（\2）？"),
+            (r"^(.+)进行岭上摸牌；当前宝牌为 (.+)。$", r"\1が嶺上牌をツモしました。現在のドラは \2 です。"),
+        )
+        for pattern, replacement in patterns:
+            if re.match(pattern, text):
+                return re.sub(pattern, replacement, text)
+        replacements = (
+            ("最终", "最終"), ("统计", "統計"), ("小局", "局数"),
+            ("和牌", "和了"), ("荣和", "ロン"), ("自摸", "ツモ"),
+            ("放铳", "放銃"), ("立直", "リーチ"), ("副露", "副露"),
+            ("庄家", "親"), ("门清", "門前"), ("点数", "点数"),
+            ("你的手牌", "あなたの手牌"), ("摸牌", "ツモ牌"),
+            ("牌山剩余", "山の残り"), ("事件", "イベント"),
+            ("当前向听数", "現在のシャンテン数"), ("推荐弃牌", "推奨打牌"),
+            ("弃牌后", "打牌後"), ("向听", "シャンテン"),
+            ("种有效牌", "種の有効牌"), ("按可见牌修正后共", "見えている牌を反映して合計"),
+            ("张", "枚"), ("结果", "結果"), ("连庄", "連荘"), ("轮庄", "親流れ"),
+            ("听牌罚符", "ノーテン罰符"), ("合计获得", "が合計"),
+            ("可以吃", "チーできます"), ("请选择吃法", "チーの形を選択してください"),
+            ("请输入要打出的牌或编号", "捨てる牌または番号を入力してください"),
+            ("是否杠", "カンしますか"), ("是否碰", "ポンしますか"),
+            ("是否荣和", "ロンしますか"), ("是否自摸", "ツモ和了しますか"),
+            ("是否", ""), ("宣布", "を宣言しました"), ("打出了", "の打牌："),
+            ("进行了", "をしました："), ("对 ", ""),
+            ("进行岭上摸牌", "嶺上牌をツモしました"), ("当前宝牌为", "現在のドラは"),
+            ("振听", "フリテン"), ("舍牌", "捨て牌"), ("同巡", "同巡"),
+            ("立直见逃", "リーチ後見逃し"), ("你处于", "現在"),
+            ("无法", "できません"), ("本局结束前将保持", "この局が終わるまで継続します："),
+            ("你放弃了", "見逃したため"), ("进入", "になりました："),
+            ("持续到下次摸牌", "次の自摸まで継続します"),
+            ("本局", "この局"), ("精算", "精算"), ("宝牌", "ドラ"),
+            ("玩家", "プレイヤー"), ("电脑", "CPU"), ("简单", "初級"), ("高级", "上級"),
+            ("万子", "萬子"), ("筒子", "筒子"), ("索子", "索子"), ("字牌", "字牌"),
+            ("是", "はい"), ("否", "いいえ"), ("默认", "既定値："),
+            ("点", "点"), ("。", "。"), ("：", "："), ("（", "（"), ("）", "）"),
+            ("，", "、"),
+        )
+        out = text
+        for old, new in replacements:
+            out = out.replace(old, new)
+        return out
 
     def _name(self, player: PlayerState) -> str:
         if self.language == "en":
             return player.name
-        return {"You": "玩家", "AI-1": "电脑1", "AI-2": "电脑2", "AI-3": "电脑3"}[player.name]
+        if self.language == "zh":
+            return {"You": "玩家", "AI-1": "电脑1", "AI-2": "电脑2", "AI-3": "电脑3"}[player.name]
+        return {"You": "あなた", "AI-1": "CPU1", "AI-2": "CPU2", "AI-3": "CPU3"}[player.name]
 
     def _meld_name(self, kind: str) -> str:
         if self.language == "en":
             return kind
-        return {"chi": "吃", "pon": "碰", "kan": "杠"}.get(kind, kind)
+        if self.language == "zh":
+            return {"chi": "吃", "pon": "碰", "kan": "杠"}.get(kind, kind)
+        return {"chi": "チー", "pon": "ポン", "kan": "カン"}.get(kind, kind)
 
     def play(self) -> None:
         if self.interactive and self.assist_mode is None:
@@ -131,13 +225,17 @@ class MahjongGame:
             self.assist_mode = "normal"
         levels = ", ".join(
             f"{self._name(p)}=" + (
-                ("高级" if p.ai_level == "advanced" else "简单") if self.language == "zh" else p.ai_level
+                (("高级" if p.ai_level == "advanced" else "简单") if self.language == "zh" else
+                 ("上級" if p.ai_level == "advanced" else "初級") if self.language == "ja" else p.ai_level)
             )
             for p in self.players
         )
         if self.language == "zh":
             mode = "提示" if self.assist_mode == "hint" else "普通"
             print(f"东风战开始（种子={self.seed!r}；模式={mode}；{levels}）。")
+        elif self.language == "ja":
+            mode = "ヒント" if self.assist_mode == "hint" else "通常"
+            print(f"東風戦開始（シード={self.seed!r}；モード={mode}；{levels}）。")
         else:
             print(f"East-round game started (seed={self.seed!r}; mode={self.assist_mode}; {levels}).")
         while self.round_hand < 4 and all(p.points > 0 for p in self.players):
@@ -220,6 +318,9 @@ class MahjongGame:
         if self.language == "zh":
             print(f"\n东{self.round_hand + 1}局，庄家={self._name(self.players[self.dealer])}，本场={self.honba}")
             print(f"宝牌：{' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
+        elif self.language == "ja":
+            print(f"\n東{self.round_hand + 1}局、親={self._name(self.players[self.dealer])}、本場={self.honba}")
+            print(f"ドラ：{' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
         else:
             print(f"\nEast {self.round_hand + 1}, dealer={self._name(self.players[self.dealer])}, honba={self.honba}")
             print(f"Dora: {' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
@@ -597,6 +698,7 @@ class MahjongGame:
                 print(self._t(
                     f"{self._name(p)} calls {kind} on {tile}.",
                     f"{self._name(p)}对 {tile} 宣布{self._meld_name(kind)}。",
+                    f"{self._name(p)}が {tile} を{self._meld_name(kind)}しました。",
                 ))
                 if kind == "kan":
                     # Daiminkan receives a replacement tile from the dead wall and
@@ -748,7 +850,14 @@ class MahjongGame:
             reason_text = {
                 "own-discard": "舍牌振听", "temporary": "同巡振听", "riichi missed-ron": "立直见逃振听"
             }
-            reasons_display = reasons if self.language == "en" else [reason_text[x] for x in reasons]
+            reason_ja = {
+                "own-discard": "捨て牌フリテン", "temporary": "同巡フリテン", "riichi missed-ron": "リーチ後見逃しフリテン"
+            }
+            reasons_display = (
+                reasons if self.language == "en" else
+                [reason_text[x] for x in reasons] if self.language == "zh" else
+                [reason_ja[x] for x in reasons]
+            )
             print(self._t(
                 f"Furiten: YES ({', '.join(reasons_display)})",
                 f"振听：是（{'、'.join(reasons_display)}）",
@@ -785,13 +894,18 @@ class MahjongGame:
             for start, label in labels:
                 end = start + (9 if start < 27 else 7)
                 row = " ".join(f"{index_to_tile(i)}:{remaining[i]}" for i in range(start, end))
-                display_label = label.split("/")[1] if self.language == "zh" else label.split("/")[0]
+                if self.language == "zh":
+                    display_label = label.split("/")[1]
+                elif self.language == "ja":
+                    display_label = {"m/万子": "萬子", "p/筒子": "筒子", "s/索子": "索子", "honors/字牌": "字牌"}[label]
+                else:
+                    display_label = label.split("/")[0]
                 print(f"    {display_label}: {row}")
 
     def _score_label(self, sb: ScoreBreakdown) -> str:
         names = [x.name for x in sb.yakuman] or [x.name for x in sb.yaku]
-        if self.language == "zh":
-            translations = {
+        if self.language in {"zh", "ja"}:
+            translations_zh = {
                 "Riichi": "立直", "Menzen Tsumo": "门前清自摸和", "Pinfu": "平和",
                 "Tanyao": "断幺九", "Yakuhai": "役牌", "Chiitoitsu": "七对子",
                 "Toitoi": "对对和", "Honitsu": "混一色", "Chinitsu": "清一色",
@@ -799,9 +913,22 @@ class MahjongGame:
                 "Chuuren Poutou": "九莲宝灯", "Daisangen": "大三元",
                 "Suuankou": "四暗刻", "Suuankou Tanki": "四暗刻单骑", "Suukantsu": "四杠子",
             }
+            translations_ja = {
+                "Riichi": "立直", "Menzen Tsumo": "門前清自摸和", "Pinfu": "平和",
+                "Tanyao": "断么九", "Yakuhai": "役牌", "Chiitoitsu": "七対子",
+                "Toitoi": "対々和", "Honitsu": "混一色", "Chinitsu": "清一色",
+                "Sankantsu": "三槓子", "Kokushi Musou": "国士無双",
+                "Chuuren Poutou": "九蓮宝燈", "Daisangen": "大三元",
+                "Suuankou": "四暗刻", "Suuankou Tanki": "四暗刻単騎", "Suukantsu": "四槓子",
+            }
+            translations = translations_zh if self.language == "zh" else translations_ja
             names = [translations.get(name, name) for name in names]
         pts = sb.points.ron_points or sb.points.tsumo_total_points
-        return self._t(f"{', '.join(names)}; {pts} points", f"{'、'.join(names)}；{pts}点")
+        return self._t(
+            f"{', '.join(names)}; {pts} points",
+            f"{'、'.join(names)}；{pts}点",
+            f"{'・'.join(names)}、{pts}点",
+        )
 
     def _settle_ron(self, loser: int, winners: list[tuple[int, ScoreBreakdown]]) -> None:
         for winner, sb in winners:

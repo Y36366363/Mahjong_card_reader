@@ -7,7 +7,8 @@
 - Added **normal** and **hint** modes. Hint mode shows current shanten, an advanced-AI discard recommendation, effective tile types/counts, and the existing remaining-tile tracker grouped by suit.
 - Added a hand-settlement screen with score changes and dealer continuation/rotation; interactive games wait for confirmation before starting the next hand.
 - Added final match statistics for hands, wins, ron, tsumo, deal-ins, riichi, chi, pon, and kan.
-- Added `language = "en" | "zh"` for game mode. Chinese mode localizes game prompts, player status, calls, wins, draws, settlements, rankings, statistics, yaku names, and accepts Chinese interaction such as `是` / `否`.
+- Added `language = "en" | "zh" | "ja"` for game mode. Localized modes cover game prompts, player status, calls, wins, draws, settlements, rankings, statistics, and yaku names.
+- Added Japanese game localization with `language = "ja"`, following the same configuration and interaction flow as Chinese mode.
 
 ## Updates 7/12/2026
 
@@ -121,6 +122,12 @@ Or override it from the command line:
 
 ```bash
 python main.py --mode game --language zh --assist-mode hint
+```
+
+Japanese mode:
+
+```bash
+python main.py --mode game --language ja --assist-mode hint
 ```
 
 Choose the four computer levels in seat order (`You,AI-1,AI-2,AI-3`):
@@ -281,3 +288,186 @@ python main.py -c my_config.toml
 - Dragons: `P F C` (white/green/red)
 
 Red fives are accepted as `0m 0p 0s` and are treated as normal 5s for shanten/counting.
+
+---
+
+## Game Guide and Feature Reference (English)
+
+### 1. Starting a game
+
+Run an interactive East-round match:
+
+```bash
+python main.py --mode game --language en
+```
+
+Useful options:
+
+- `--seed 2026`: fixes every shuffled wall for reproducible play.
+- `--assist-mode normal`: shows the table without strategic recommendations.
+- `--assist-mode hint`: enables shanten, discard, effective-tile, and tile-tracker hints.
+- `--ai-levels simple,advanced,advanced,simple`: selects one computer level for each seat in `You,AI-1,AI-2,AI-3` order. In an interactive game, the first seat remains user-controlled.
+- `--auto-game`: lets the computer control all four seats for testing or simulation.
+- `--language en|zh|ja`: selects English, Chinese, or Japanese game UI.
+
+The same settings can be stored in JSON:
+
+```json
+{
+  "mode": "game",
+  "language": "en",
+  "game": {
+    "seed": 2026,
+    "assist_mode": "hint",
+    "ai_levels": ["simple", "advanced", "advanced", "simple"]
+  }
+}
+```
+
+### 2. Match structure
+
+- Every player starts with 25,000 points.
+- A match runs from East 1 through East 4.
+- A dealer win or dealer tenpai at an exhaustive draw causes a continuation and adds one honba.
+- A non-dealer win, or a dealer-noten exhaustive draw, rotates the dealer.
+- The match ends after East 4 rotates or immediately when any player reaches zero or below.
+- Final ranking is sorted by score. Remaining riichi sticks are awarded to the current first-place player.
+
+### 3. Player turn display
+
+Before every user-controlled discard, the game shows:
+
+- your indexed hand and latest draw;
+- live-wall count and all four scores;
+- dealer, riichi, closed/open status, and open-meld count for every player;
+- all four rivers;
+- your melds and furiten reason, when applicable.
+
+Discard by entering either the displayed index or tile token, such as `7` or `5p`. A legal closed tenpai discard also offers a riichi confirmation. After riichi, non-winning draws are automatically discarded because the hand is locked.
+
+### 4. Calls and wins
+
+- **Pon** and **kan** use a yes/no confirmation.
+- **Chi** lists every legal sequence; enter its number or `0` to pass.
+- A ron or tsumo opportunity shows the detected yaku and points before confirmation.
+- Passing ron causes temporary furiten until the next draw. Passing after riichi causes furiten for the rest of that hand.
+- Discard furiten blocks ron when any current winning tile appears in your own river. Furiten never blocks tsumo.
+
+### 5. Hint mode and tile tracker
+
+Hint mode uses the advanced heuristic AI to show:
+
+- current standard-hand shanten;
+- recommended discard and resulting shanten;
+- number of effective tile types;
+- remaining effective copies after visible-tile adjustment;
+- estimated remaining count for every tile, grouped by suit and honors.
+
+The tracker only uses information visible to the player: your hand, every river, public melds, and dora indicators. It does not reveal opponents' concealed tiles or the actual future wall.
+
+### 6. Computer levels
+
+- **Simple computer:** minimizes standard-hand shanten, normally remains closed for riichi, and opens mainly for value honors.
+- **Advanced computer:** additionally evaluates effective-tile breadth/count, dora and value-honor retention, genbutsu, suji, walls, honor safety, current rank, folding, call value, and kan risk.
+
+These computers are deterministic heuristic agents; they do not require reinforcement-learning training.
+
+### 7. Settlement and statistics
+
+After each hand, the game displays every score change and whether the dealer continues or rotates. Interactive play waits for confirmation before the next hand. At match end it reports final ranking plus hands, wins, ron, tsumo, deal-ins, riichi, chi, pon, and kan for every player.
+
+### 8. Current rules scope
+
+The simulator includes fixed walls after the initial shuffle, ron/tsumo settlement, honba, riichi sticks, dealer continuations, exhaustive-draw tenpai payments, furiten, public calls, replacement draws after open kan, additional kan dora, and multi-ron checks. Scoring reuses the project's existing supported-yaku engine. Some less common rules—such as chankan, active closed/added kan choices, ippatsu, rinshan yaku, haitei/houtei, and abortive draws—remain future extensions.
+
+---
+
+## 麻将对局指引与功能介绍（中文）
+
+### 1. 开始游戏
+
+启动主视角东风战：
+
+```bash
+python main.py --mode game --language zh
+```
+
+常用参数：
+
+- `--seed 2026`：固定每一局洗好的牌山，方便复现相同对局。
+- `--assist-mode normal`：普通模式，只显示牌桌信息。
+- `--assist-mode hint`：提示模式，提供向听、推荐弃牌、有效牌和记牌器。
+- `--ai-levels simple,advanced,advanced,simple`：按照“玩家、电脑1、电脑2、电脑3”的座位顺序设置电脑等级。交互模式下第一个座位仍由玩家控制。
+- `--auto-game`：四个座位全部交给电脑，用于测试和批量模拟。
+- `--language en|zh|ja`：选择英文、中文或日文牌局界面。
+
+也可以写入 JSON 配置：
+
+```json
+{
+  "mode": "game",
+  "language": "zh",
+  "game": {
+    "seed": 2026,
+    "assist_mode": "hint",
+    "ai_levels": ["simple", "advanced", "advanced", "simple"]
+  }
+}
+```
+
+### 2. 对局结构
+
+- 四家初始点数均为25,000点。
+- 东风战从东一局进行至东四局。
+- 庄家和牌，或流局时庄家听牌，则连庄并增加一本场。
+- 闲家和牌，或流局时庄家未听牌，则轮庄。
+- 东四局轮庄后结束；任何玩家点数降至0点或以下时立即提前结束。
+- 最终按点数排名；终局无人领取的立直棒交给当前第一名。
+
+### 3. 玩家出牌界面
+
+每次轮到主视角弃牌前，程序会显示：
+
+- 带编号的手牌与本巡摸牌；
+- 牌山剩余数量和四家点数；
+- 每家的庄家、立直、门清/副露状态与副露数量；
+- 四家的完整牌河；
+- 自己的副露和振听原因。
+
+弃牌时可以输入显示编号，也可以直接输入牌名，例如 `7` 或 `5p`。闭手弃牌后达到听牌时，程序会询问是否立直。立直后手牌锁定，未和牌的摸牌会自动摸切。
+
+### 4. 吃、碰、杠与和牌
+
+- **碰**和**杠**使用“是/否”确认。
+- **吃**会列出所有合法组合，输入编号选择，输入 `0` 跳过。
+- 可以荣和或自摸时，程序会先显示检测到的役种与点数，再询问是否和牌。
+- 放弃一次可以荣和的牌会进入同巡振听，持续到自己的下一次摸牌。
+- 立直后见逃会在本局剩余时间内保持振听。
+- 当前所有和牌张中只要有一张出现在自己的牌河，就构成舍牌振听。振听只阻止荣和，不阻止自摸。
+
+### 5. 提示模式与记牌器
+
+提示模式使用高级电脑的启发式分析，显示：
+
+- 当前标准手向听数；
+- 推荐弃牌及弃牌后的向听数；
+- 有效牌种类；
+- 扣除可见牌后的剩余有效牌数量；
+- 按万子、筒子、索子和字牌分组的每种牌推算剩余数量。
+
+记牌器只使用玩家能够看到的信息：自己的手牌、四家牌河、公开副露和宝牌指示牌。它不会读取其他家的暗手牌，也不会泄露真实后续牌山。
+
+### 6. 电脑等级
+
+- **简单电脑**：主要选择最低标准手向听数的弃牌，通常保持门清立直，只对役牌进行较简单的副露。
+- **高级电脑**：进一步考虑有效进张、剩余牌数、宝牌与役牌保留、现物、筋、壁、字牌安全度、当前排名、弃和判断、副露收益和杠牌风险。
+
+两种电脑均为确定性的启发式程序，不需要进行大量强化学习训练。
+
+### 7. 小局结算与最终统计
+
+每个小局结束后会显示四家当前点数、本局点数变化，以及连庄或轮庄结果。交互模式会等待玩家确认后再进入下一局。整场结束后自动显示最终点数、排名，以及每家的小局数、和牌、荣和、自摸、放铳、立直、吃、碰、杠数据。
+
+### 8. 当前规则支持范围
+
+目前模拟器支持：开局一次洗牌后固定牌山、荣和/自摸结算、本场、立直棒、连庄、流局听牌罚符、振听、公开吃碰杠、明杠岭上摸牌、杠宝牌和多家荣和检查。和牌役种与点数沿用项目现有计分模块。抢杠、主动暗杠/加杠、一发、岭上开花役、海底/河底、途中流局等较少见规则仍属于后续扩展范围。

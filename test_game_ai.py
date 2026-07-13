@@ -117,6 +117,23 @@ class AdvancedAITests(unittest.TestCase):
         self.assertTrue(any("请选择模式" in prompt for prompt in prompts))
         self.assertTrue(any("默认否" in prompt for prompt in prompts))
 
+    def test_japanese_game_view_is_localized(self) -> None:
+        game = MahjongGame(
+            interactive=True, assist_mode="hint", language="ja", ai_levels=["advanced"] * 4
+        )
+        game.wall = ["1m"] * 20
+        game.dora_indicators = ["4p"]
+        game.players[0].hand = "1m 2m 3m 4m 5m 6m 2p 3p 4p 5s 6s 7s E E".split()
+        output = StringIO()
+        with redirect_stdout(output):
+            game._show_state("E")
+        text = output.getvalue()
+        self.assertIn("あなたの手牌", text)
+        self.assertIn("プレイヤー状態", text)
+        self.assertIn("推奨打牌", text)
+        self.assertIn("牌カウンター", text)
+        self.assertNotIn("Your hand", text)
+
     def test_automatic_match_collects_final_statistics(self) -> None:
         game = MahjongGame(seed=91, interactive=False, assist_mode="normal")
         with redirect_stdout(StringIO()):

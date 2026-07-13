@@ -212,9 +212,9 @@ def main() -> None:
     )
     ap.add_argument(
         "--language",
-        choices=["en", "zh"],
+        choices=["en", "zh", "ja"],
         default=None,
-        help="Game display language: en or zh",
+        help="Game display language: en, zh, or ja",
     )
     args = ap.parse_args()
 
