@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+from remaining import RemainingTileCounter
 from scoring import ScoreBreakdown, score_points_from_config
 from shanten import shanten_standard, shanten_standard_draw_state
 from tiles import index_to_tile, tile_to_index, tiles_to_counts
@@ -33,6 +34,19 @@ class MeldState:
 
 
 @dataclass
+class PlayerStats:
+    hands: int = 0
+    wins: int = 0
+    ron: int = 0
+    tsumo: int = 0
+    deal_in: int = 0
+    riichi: int = 0
+    chi: int = 0
+    pon: int = 0
+    kan: int = 0
+
+
+@dataclass
 class PlayerState:
     name: str
     ai_level: str = "simple"
@@ -43,6 +57,7 @@ class PlayerState:
     riichi: bool = False
     temporary_furiten: bool = False
     riichi_furiten: bool = False
+    stats: PlayerStats = field(default_factory=PlayerStats)
 
     def sort(self) -> None:
         self.hand.sort(key=tile_sort_key)
@@ -66,10 +81,14 @@ class MahjongGame:
         seed: int | None = None,
         interactive: bool = True,
         ai_levels: list[str] | None = None,
+        assist_mode: str | None = None,
     ) -> None:
         self.rng = random.Random(seed)
         self.seed = seed
         self.interactive = interactive
+        if assist_mode not in {None, "normal", "hint"}:
+            raise ValueError("assist_mode must be normal or hint.")
+        self.assist_mode = assist_mode
         levels = ai_levels or ["simple"] * 4
         if len(levels) != 4 or any(level not in {"simple", "advanced"} for level in levels):
             raise ValueError("ai_levels must contain four values: simple or advanced.")
@@ -87,8 +106,12 @@ class MahjongGame:
         self._call_win_dealer_continues: bool | None = None
 
     def play(self) -> None:
+        if self.interactive and self.assist_mode is None:
+            self.assist_mode = self._choose_assist_mode()
+        elif self.assist_mode is None:
+            self.assist_mode = "normal"
         levels = ", ".join(f"{p.name}={p.ai_level}" for p in self.players)
-        print(f"East-round game started (seed={self.seed!r}; {levels}).")
+        print(f"East-round game started (seed={self.seed!r}; mode={self.assist_mode}; {levels}).")
         while self.round_hand < 4 and all(p.points > 0 for p in self.players):
             dealer_continues = self._play_hand()
             if dealer_continues:
@@ -108,6 +131,26 @@ class MahjongGame:
         ranked = sorted(enumerate(self.players), key=lambda x: (-x[1].points, x[0]))
         for rank, (_, p) in enumerate(ranked, 1):
             print(f"  {rank}. {p.name}: {p.points}")
+        print("\nFinal statistics")
+        print("  Player  Hands Wins Ron Tsumo Deal-in Riichi Chi Pon Kan")
+        for p in self.players:
+            s = p.stats
+            print(
+                f"  {p.name:<7} {s.hands:>5} {s.wins:>4} {s.ron:>3} {s.tsumo:>5} "
+                f"{s.deal_in:>7} {s.riichi:>6} {s.chi:>3} {s.pon:>3} {s.kan:>3}"
+            )
+
+    def _choose_assist_mode(self) -> str:
+        print("Select play mode / 选择游戏模式:")
+        print("  1. Normal / 普通模式")
+        print("  2. Hint / 提示模式（向听、推荐弃牌、记牌器）")
+        while True:
+            answer = input("Mode [1/2]: ").strip().lower()
+            if answer in {"1", "normal", "普通"}:
+                return "normal"
+            if answer in {"2", "hint", "提示"}:
+                return "hint"
+            print("Please enter 1 or 2 / 请输入 1 或 2。")
 
     def _new_wall(self) -> None:
         tiles = [index_to_tile(i) for i in range(34) for _ in range(4)]
@@ -117,6 +160,19 @@ class MahjongGame:
         self.dora_indicators = [self.dead_wall[4]]
 
     def _play_hand(self) -> bool:
+        before = [p.points for p in self.players]
+        for p in self.players:
+            p.stats.hands += 1
+        dealer_continues = self._play_hand_core()
+        self._show_hand_settlement(before, dealer_continues)
+        match_ends = any(p.points <= 0 for p in self.players) or (
+            self.round_hand == 3 and not dealer_continues
+        )
+        if self.interactive and not match_ends:
+            input("Press Enter to continue to the next hand / 按回车进入下一局……")
+        return dealer_continues
+
+    def _play_hand_core(self) -> bool:
         self._new_wall()
         self._call_win_dealer_continues = None
         for p in self.players:
@@ -176,6 +232,14 @@ class MahjongGame:
             print("Tenpai payment: " + ", ".join(self.players[i].name for i in tenpai) + " receive 3000 total.")
         dealer_tenpai = self.dealer in tenpai
         return dealer_tenpai
+
+    def _show_hand_settlement(self, before: list[int], dealer_continues: bool) -> None:
+        print("\nHand settlement / 本局结算")
+        for i, p in enumerate(self.players):
+            delta = p.points - before[i]
+            print(f"  {p.name:<5}: {p.points:>6} ({delta:+d})")
+        result = "dealer continues / 连庄" if dealer_continues else "dealer rotates / 轮庄"
+        print(f"  Result: {result}")
 
     def _full_for_analysis(self, p: PlayerState, extra: str | None = None) -> list[str]:
         result = p.hand.copy()
@@ -277,11 +341,14 @@ class MahjongGame:
             while True:
                 raw = input("Discard tile (or index): ").strip()
                 if raw.isdigit() and 1 <= int(raw) <= len(p.hand):
-                    return p.hand[int(raw) - 1]
+                    discard = p.hand[int(raw) - 1]
+                    break
                 if raw in p.hand:
-                    return raw
+                    discard = raw
+                    break
                 print("That tile is not in your hand.")
-        if p.ai_level == "advanced":
+            best_shanten = self._shanten_after_discard(p, discard)
+        elif p.ai_level == "advanced":
             discard = self._choose_advanced_discard(seat)
             best_shanten = self._shanten_after_discard(p, discard)
         else:
@@ -296,6 +363,7 @@ class MahjongGame:
         )
         if declare:
             p.riichi = True; p.points -= 1000; self.riichi_sticks += 1
+            p.stats.riichi += 1
             print(f"{p.name} declares riichi.")
         p.hand.append(discard); p.sort()
         return discard
@@ -448,12 +516,11 @@ class MahjongGame:
         order = [(discarder + n) % 4 for n in range(1, 4)]
         for caller in order:
             opts = self._call_options(caller, discarder, tile)
+            if self.players[caller].riichi:
+                opts = []
             chosen: tuple[str, list[str]] | None = None
             if caller == 0 and opts and self.interactive:
-                labels = [f"{i + 1}:{kind} {' '.join(ts)}" for i, (kind, ts) in enumerate(opts)]
-                raw = input("Call? 0:pass, " + ", ".join(labels) + " > ").strip()
-                if raw.isdigit() and 1 <= int(raw) <= len(opts):
-                    chosen = opts[int(raw) - 1]
+                chosen = self._choose_user_call(tile, opts)
             elif caller != 0 or not self.interactive:
                 seat_wind = WINDS[(caller - self.dealer) % 4]
                 if self.players[caller].ai_level == "advanced":
@@ -466,6 +533,7 @@ class MahjongGame:
                 needed = meld_tiles.copy(); needed.remove(tile)
                 for x in needed: p.hand.remove(x)
                 p.melds.append(MeldState(kind, meld_tiles)); p.sort()
+                setattr(p.stats, kind, getattr(p.stats, kind) + 1)
                 print(f"{p.name} calls {kind} on {tile}.")
                 if kind == "kan":
                     # Daiminkan receives a replacement tile from the dead wall and
@@ -490,6 +558,9 @@ class MahjongGame:
                         self._settle_tsumo(caller, rinshan_score)
                         self._call_win_dealer_continues = caller == self.dealer
                         return None
+                if caller == 0 and self.interactive:
+                    event = f"replacement draw {replacement}" if kind == "kan" else f"called {kind} on {tile}"
+                    self._show_state(replacement if kind == "kan" else tile, event_label=event)
                 discard = self._choose_discard(caller)
                 p.hand.remove(discard); p.river.append(discard)
                 print(f"{p.name} discarded {discard}.")
@@ -500,6 +571,30 @@ class MahjongGame:
                 # Calling consumes the caller's normal draw; after its immediate
                 # discard, play advances to the following seat.
                 return (caller + 1) % 4
+        return None
+
+    def _choose_user_call(
+        self, tile: str, opts: list[tuple[str, list[str]]]
+    ) -> tuple[str, list[str]] | None:
+        """Prompt pon/kan as yes-no and chi as an explicit sequence choice."""
+        by_kind = {kind: [option for option in opts if option[0] == kind] for kind in ("kan", "pon", "chi")}
+        if by_kind["kan"] and self._yes_no(f"Kan {tile}? / 杠 {tile}？", False):
+            return by_kind["kan"][0]
+        if by_kind["pon"] and self._yes_no(f"Pon {tile}? / 碰 {tile}？", False):
+            return by_kind["pon"][0]
+        chi = by_kind["chi"]
+        if chi:
+            print(f"Chi opportunity on {tile} / 可吃 {tile}：")
+            print("  0. Pass / 跳过")
+            for i, (_, sequence) in enumerate(chi, 1):
+                print(f"  {i}. {' '.join(sequence)}")
+            while True:
+                raw = input("Choose chi / 选择吃法: ").strip()
+                if raw in {"", "0"}:
+                    return None
+                if raw.isdigit() and 1 <= int(raw) <= len(chi):
+                    return chi[int(raw) - 1]
+                print("Invalid choice / 选择无效。")
         return None
 
     def _advanced_call_choice(
@@ -545,11 +640,18 @@ class MahjongGame:
             choices.append(((after_shanten, -after_ukeire, 1 if kind == "kan" else 0), option))
         return min(choices, default=((), None))[1]
 
-    def _show_state(self, draw: str) -> None:
+    def _show_state(self, draw: str, *, event_label: str | None = None) -> None:
         p = self.players[0]
         print(f"\nWall: {len(self.wall)} | Scores: " + ", ".join(f"{x.name} {x.points}" for x in self.players))
         print("Your hand: " + " ".join(f"{i + 1}:{t}" for i, t in enumerate(p.hand)))
-        print(f"Draw: {draw} | Shanten: {self._standard_shanten(p)}")
+        print(f"Event: {event_label}" if event_label else f"Draw: {draw}")
+        print("Player status:")
+        for i, player in enumerate(self.players):
+            dealer = " dealer/庄" if i == self.dealer else ""
+            riichi = " riichi/立直" if player.riichi else ""
+            meld_count = len(player.melds)
+            meld_status = f" {meld_count} meld(s)/{meld_count}副露" if meld_count else " closed/门清"
+            print(f"  {player.name}:{dealer}{riichi}{meld_status}")
         print("Rivers:")
         for i, player in enumerate(self.players):
             marker = " (dealer)" if i == self.dealer else ""
@@ -563,6 +665,33 @@ class MahjongGame:
             print(f"Furiten: YES ({', '.join(reasons)})")
         if p.melds:
             print("Melds: " + " / ".join(f"{m.kind}({' '.join(m.tiles)})" for m in p.melds))
+        if self.assist_mode == "hint":
+            shanten = self._standard_shanten(p)
+            recommendation = draw if p.riichi else self._choose_advanced_discard(0)
+            after = self._shanten_after_discard(p, recommendation)
+            visible = self._visible_counts(0)
+            p.hand.remove(recommendation)
+            kinds, total = self._ukeire(p, visible)
+            p.hand.append(recommendation); p.sort()
+            print("Hint / 提示:")
+            print(f"  Current shanten / 当前向听: {shanten}")
+            print(
+                f"  Recommended discard / 推荐弃牌: {recommendation} "
+                f"(after: {after} shanten, {kinds} effective types / {total} visible-adjusted tiles)"
+            )
+            counter = RemainingTileCounter()
+            known = p.hand.copy() + self.dora_indicators
+            for player in self.players:
+                known.extend(player.river)
+                for meld in player.melds:
+                    known.extend(meld.tiles)
+            counter.set_used_tiles(known)
+            remaining = counter.remaining_counts()
+            print("  Tile tracker / 记牌器（从你的视角推算剩余）：")
+            for start, label in ((0, "m"), (9, "p"), (18, "s"), (27, "honors")):
+                end = start + (9 if start < 27 else 7)
+                row = " ".join(f"{index_to_tile(i)}:{remaining[i]}" for i in range(start, end))
+                print(f"    {label}: {row}")
 
     @staticmethod
     def _score_label(sb: ScoreBreakdown) -> str:
@@ -574,6 +703,9 @@ class MahjongGame:
         for winner, sb in winners:
             amount = int(sb.points.ron_points) + self.honba * 300
             self.players[loser].points -= amount; self.players[winner].points += amount
+            self.players[winner].stats.wins += 1
+            self.players[winner].stats.ron += 1
+            self.players[loser].stats.deal_in += 1
             print(f"{self.players[winner].name} ron: {self._score_label(sb)} from {self.players[loser].name}.")
         if winners and self.riichi_sticks:
             self.players[winners[0][0]].points += self.riichi_sticks * 1000
@@ -592,9 +724,20 @@ class MahjongGame:
             amount += self.honba * 100
             self.players[loser].points -= amount; self.players[winner].points += amount
         self.players[winner].points += self.riichi_sticks * 1000; self.riichi_sticks = 0
+        self.players[winner].stats.wins += 1
+        self.players[winner].stats.tsumo += 1
         print(f"{self.players[winner].name} tsumo: {self._score_label(sb)}.")
 
     def _yes_no(self, prompt: str, default: bool) -> bool:
-        if not self.interactive: return default
-        answer = input(prompt + " [Y/n] ").strip().lower()
-        return answer not in {"n", "no"}
+        if not self.interactive:
+            return default
+        marker = "[Y/n]" if default else "[y/N]"
+        while True:
+            answer = input(f"{prompt} {marker} ").strip().lower()
+            if not answer:
+                return default
+            if answer in {"y", "yes", "是", "s"}:
+                return True
+            if answer in {"n", "no", "否", "f"}:
+                return False
+            print("Please answer yes or no / 请输入是或否。")

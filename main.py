@@ -204,6 +204,12 @@ def main() -> None:
         default=None,
         help="Game mode: four comma-separated AI levels (simple/advanced)",
     )
+    ap.add_argument(
+        "--assist-mode",
+        choices=["normal", "hint"],
+        default=None,
+        help="Interactive game: normal play or discard/tracker hints",
+    )
     args = ap.parse_args()
 
     config: dict[str, Any] = {}
@@ -227,6 +233,7 @@ def main() -> None:
         game_cfg = config.get("game", {})
         seed = args.seed if args.seed is not None else game_cfg.get("seed")
         levels_value = args.ai_levels if args.ai_levels is not None else game_cfg.get("ai_levels")
+        assist_mode = args.assist_mode if args.assist_mode is not None else game_cfg.get("assist_mode")
         levels = None
         if levels_value:
             if isinstance(levels_value, str):
@@ -236,7 +243,12 @@ def main() -> None:
             else:
                 ap.error("game.ai_levels must be a comma-separated string or list.")
         try:
-            MahjongGame(seed=seed, interactive=not args.auto_game, ai_levels=levels).play()
+            MahjongGame(
+                seed=seed,
+                interactive=not args.auto_game,
+                ai_levels=levels,
+                assist_mode=str(assist_mode).lower() if assist_mode else None,
+            ).play()
         except ValueError as e:
             ap.error(str(e))
         return

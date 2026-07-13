@@ -1,5 +1,13 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/13/2026
+
+- Reworked the interactive player view: every discard shows the hand, draw, all four rivers, scores, dealer, riichi, and each player's open-meld count.
+- Split call prompts by action: pon and kan use yes/no prompts, while chi lists every legal sequence separately.
+- Added **normal** and **hint** modes. Hint mode shows current shanten, an advanced-AI discard recommendation, effective tile types/counts, and the existing remaining-tile tracker grouped by suit.
+- Added a hand-settlement screen with score changes and dealer continuation/rotation; interactive games wait for confirmation before starting the next hand.
+- Added final match statistics for hands, wins, ron, tsumo, deal-ins, riichi, chi, pon, and kan.
+
 ## Updates 7/12/2026
 
 - Added an interactive **East-round game simulation** with four players, fixed walls after each hand's initial shuffle, dealer continuations, honba, riichi sticks, early bankruptcy settlement, and final ranking.
@@ -87,6 +95,12 @@ Start an interactive game (you are always `You`; enter a tile or its displayed i
 
 ```bash
 python main.py --mode game --seed 2026
+```
+
+The game asks for normal or hint mode at startup. It can also be selected directly:
+
+```bash
+python main.py --mode game --seed 2026 --assist-mode hint
 ```
 
 Choose the four computer levels in seat order (`You,AI-1,AI-2,AI-3`):

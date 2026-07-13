@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import random
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 
 from game import MahjongGame
 from shanten import shanten_standard, shanten_standard_draw_state
@@ -51,6 +54,42 @@ class AdvancedAITests(unittest.TestCase):
         discard, shanten = game._choose_simple_discard(player)
         self.assertIn(discard, player.hand)
         self.assertEqual(shanten, game._shanten_after_discard(player, discard))
+
+    def test_interactive_mode_and_separate_call_prompts(self) -> None:
+        game = MahjongGame(interactive=True)
+        with redirect_stdout(StringIO()):
+            with patch("builtins.input", side_effect=["2"]):
+                self.assertEqual(game._choose_assist_mode(), "hint")
+        options = [("pon", ["E"] * 3), ("kan", ["E"] * 4)]
+        with patch("builtins.input", side_effect=["n", "是"]):
+            self.assertEqual(game._choose_user_call("E", options), options[0])
+        chi = [("chi", ["1m", "2m", "3m"]), ("chi", ["2m", "3m", "4m"])]
+        with redirect_stdout(StringIO()):
+            with patch("builtins.input", side_effect=["2"]):
+                self.assertEqual(game._choose_user_call("3m", chi), chi[1])
+
+    def test_hint_view_contains_status_rivers_and_tracker(self) -> None:
+        game = MahjongGame(interactive=True, assist_mode="hint", ai_levels=["advanced"] * 4)
+        game.wall = ["1m"] * 20
+        game.dora_indicators = ["4p"]
+        game.players[0].hand = "1m 2m 3m 4m 5m 6m 2p 3p 4p 5s 6s 7s E E".split()
+        game.players[1].riichi = True
+        game.players[1].river = ["9m"]
+        output = StringIO()
+        with redirect_stdout(output):
+            game._show_state("E")
+        text = output.getvalue()
+        self.assertIn("Player status", text)
+        self.assertIn("Rivers", text)
+        self.assertIn("Recommended discard", text)
+        self.assertIn("Tile tracker", text)
+
+    def test_automatic_match_collects_final_statistics(self) -> None:
+        game = MahjongGame(seed=91, interactive=False, assist_mode="normal")
+        with redirect_stdout(StringIO()):
+            game.play()
+        self.assertTrue(all(player.stats.hands >= 4 for player in game.players))
+        self.assertEqual(sum(player.points for player in game.players), 100_000)
 
 
 if __name__ == "__main__":
