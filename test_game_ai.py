@@ -84,6 +84,39 @@ class AdvancedAITests(unittest.TestCase):
         self.assertIn("Recommended discard", text)
         self.assertIn("Tile tracker", text)
 
+    def test_chinese_game_view_is_localized(self) -> None:
+        game = MahjongGame(
+            interactive=True, assist_mode="hint", language="zh", ai_levels=["advanced"] * 4
+        )
+        game.wall = ["1m"] * 20
+        game.dora_indicators = ["4p"]
+        game.players[0].hand = "1m 2m 3m 4m 5m 6m 2p 3p 4p 5s 6s 7s E E".split()
+        output = StringIO()
+        with redirect_stdout(output):
+            game._show_state("E")
+        text = output.getvalue()
+        self.assertIn("你的手牌", text)
+        self.assertIn("玩家状态", text)
+        self.assertIn("牌河", text)
+        self.assertIn("推荐弃牌", text)
+        self.assertIn("记牌器", text)
+        self.assertNotIn("Your hand", text)
+
+    def test_chinese_interaction_prompts(self) -> None:
+        game = MahjongGame(interactive=True, language="zh")
+        prompts: list[str] = []
+
+        def answer_mode(prompt: str) -> str:
+            prompts.append(prompt)
+            return "提示"
+
+        with redirect_stdout(StringIO()), patch("builtins.input", side_effect=answer_mode):
+            self.assertEqual(game._choose_assist_mode(), "hint")
+        with patch("builtins.input", side_effect=lambda prompt: prompts.append(prompt) or "是"):
+            self.assertTrue(game._yes_no("是否碰 E？", False))
+        self.assertTrue(any("请选择模式" in prompt for prompt in prompts))
+        self.assertTrue(any("默认否" in prompt for prompt in prompts))
+
     def test_automatic_match_collects_final_statistics(self) -> None:
         game = MahjongGame(seed=91, interactive=False, assist_mode="normal")
         with redirect_stdout(StringIO()):

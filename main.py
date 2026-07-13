@@ -210,6 +210,12 @@ def main() -> None:
         default=None,
         help="Interactive game: normal play or discard/tracker hints",
     )
+    ap.add_argument(
+        "--language",
+        choices=["en", "zh"],
+        default=None,
+        help="Game display language: en or zh",
+    )
     args = ap.parse_args()
 
     config: dict[str, Any] = {}
@@ -234,6 +240,7 @@ def main() -> None:
         seed = args.seed if args.seed is not None else game_cfg.get("seed")
         levels_value = args.ai_levels if args.ai_levels is not None else game_cfg.get("ai_levels")
         assist_mode = args.assist_mode if args.assist_mode is not None else game_cfg.get("assist_mode")
+        language = args.language if args.language is not None else game_cfg.get("language", config.get("language", "en"))
         levels = None
         if levels_value:
             if isinstance(levels_value, str):
@@ -248,6 +255,7 @@ def main() -> None:
                 interactive=not args.auto_game,
                 ai_levels=levels,
                 assist_mode=str(assist_mode).lower() if assist_mode else None,
+                language=str(language),
             ).play()
         except ValueError as e:
             ap.error(str(e))

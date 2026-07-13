@@ -7,6 +7,7 @@
 - Added **normal** and **hint** modes. Hint mode shows current shanten, an advanced-AI discard recommendation, effective tile types/counts, and the existing remaining-tile tracker grouped by suit.
 - Added a hand-settlement screen with score changes and dealer continuation/rotation; interactive games wait for confirmation before starting the next hand.
 - Added final match statistics for hands, wins, ron, tsumo, deal-ins, riichi, chi, pon, and kan.
+- Added `language = "en" | "zh"` for game mode. Chinese mode localizes game prompts, player status, calls, wins, draws, settlements, rankings, statistics, yaku names, and accepts Chinese interaction such as `是` / `否`.
 
 ## Updates 7/12/2026
 
@@ -101,6 +102,25 @@ The game asks for normal or hint mode at startup. It can also be selected direct
 
 ```bash
 python main.py --mode game --seed 2026 --assist-mode hint
+```
+
+Set the display language at the root of `default_config.json`:
+
+```json
+{
+  "mode": "game",
+  "language": "zh",
+  "game": {
+    "assist_mode": "hint",
+    "ai_levels": ["simple", "advanced", "advanced", "simple"]
+  }
+}
+```
+
+Or override it from the command line:
+
+```bash
+python main.py --mode game --language zh --assist-mode hint
 ```
 
 Choose the four computer levels in seat order (`You,AI-1,AI-2,AI-3`):
