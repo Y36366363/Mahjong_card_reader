@@ -6,6 +6,7 @@
 - Advanced AI visible-tile estimates now include public dora indicators.
 - Advanced AI now preserves a closed tenpai riichi route instead of opening for a value honor, and rejects an equal-shanten kan when it reduces effective remaining tiles.
 - Extracted rank/shanten folding policy into a directly testable decision function.
+- Added `benchmark_ai.py` for reproducible, seat-rotated comparisons of 1-advanced/3-simple, 2-advanced/2-simple, and 3-advanced/1-simple lineups, with console summaries and detailed JSON output.
 
 ## Updates 7/13/2026
 
@@ -379,6 +380,18 @@ The tracker only uses information visible to the player: your hand, every river,
 
 These computers are deterministic heuristic agents; they do not require reinforcement-learning training.
 
+Run a balanced AI benchmark (16 games for each of the three lineups, 48 total):
+
+```bash
+python benchmark_ai.py --games 16 --workers 4 --seed 800 \
+  --json ai_benchmark.json
+```
+
+The benchmark rotates seats automatically and reports wins, ron, tsumo, deal-ins,
+riichi, calls, average points, average rank, first-place rate, fourth-place rate,
+runtime, and invalid point totals. Detailed per-game/per-player data is written to
+the optional JSON file.
+
 ### 7. Settlement and statistics
 
 After each hand, the game displays every score change and whether the dealer continues or rotates. Interactive play waits for confirmation before the next hand. At match end it reports final ranking plus hands, wins, ron, tsumo, deal-ins, riichi, chi, pon, and kan for every player.
@@ -470,6 +483,15 @@ python main.py --mode game --language zh
 - **高级电脑**：进一步考虑有效进张、剩余牌数、宝牌与役牌保留、现物、筋、壁、字牌安全度、当前排名、弃和判断、副露收益和杠牌风险。
 
 两种电脑均为确定性的启发式程序，不需要进行大量强化学习训练。
+
+运行公平轮换座位的电脑对照测试（每种阵容16场，共48场）：
+
+```bash
+python benchmark_ai.py --games 16 --workers 4 --seed 800 \
+  --json ai_benchmark.json
+```
+
+脚本会自动测试“1高级3初级”“2高级2初级”“3高级1初级”，并轮换电脑所在座位。报告包含和牌、荣和、自摸、放铳、立直、副露、平均点数、平均顺位、一位率、四位率、耗时和异常点数总和；可选 JSON 文件会保存每场、每位玩家的详细数据。
 
 ### 7. 小局结算与最终统计
 
