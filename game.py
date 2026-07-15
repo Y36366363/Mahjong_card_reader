@@ -549,7 +549,7 @@ class MahjongGame:
         return sh
 
     def _visible_counts(self, seat: int) -> list[int]:
-        visible = self.players[seat].hand.copy()
+        visible = self.players[seat].hand.copy() + self.dora_indicators.copy()
         for player in self.players:
             visible.extend(player.river)
             for meld in player.melds:
@@ -615,17 +615,24 @@ class MahjongGame:
             risk += max(0.1, one)
         return risk
 
+    def _should_fold(self, seat: int, shanten: int, threats: list[int]) -> bool:
+        """Decide whether rank and distance justify switching to defense."""
+        if not threats:
+            return False
+        player = self.players[seat]
+        rank = 1 + sum(other.points > player.points for other in self.players)
+        return shanten >= 2 or (rank == 1 and shanten >= 1)
+
     def _choose_advanced_discard(self, seat: int) -> str:
         p = self.players[seat]
         visible = self._visible_counts(seat)
         threats = [i for i, other in enumerate(self.players) if i != seat and other.riichi]
-        rank = 1 + sum(other.points > p.points for other in self.players)
         shanten_by_tile = {
             tile: self._shanten_after_discard(p, tile)
             for tile in sorted(set(p.hand), key=tile_sort_key)
         }
         best_shanten = min(shanten_by_tile.values())
-        fold = bool(threats) and (best_shanten >= 2 or (rank == 1 and best_shanten >= 1))
+        fold = self._should_fold(seat, best_shanten, threats)
         if fold:
             return min(
                 shanten_by_tile,
@@ -790,6 +797,9 @@ class MahjongGame:
         before_ukeire = self._ukeire(p, before_visible)[1]
         seat_wind = WINDS[(caller - self.dealer) % 4]
         value_honor = tile in {"P", "F", "C", "E", seat_wind}
+        # A closed hand that is already tenpai should preserve its riichi route.
+        if p.is_closed and before_shanten <= 0:
+            return None
         choices: list[tuple[tuple[int, int, int], tuple[str, list[str]]]] = []
         for option in opts:
             kind, meld_tiles = option
@@ -813,6 +823,8 @@ class MahjongGame:
             if after_shanten > before_shanten:
                 continue
             if before_shanten <= 1 and after_ukeire * 2 < before_ukeire:
+                continue
+            if kind == "kan" and after_shanten >= before_shanten and after_ukeire < before_ukeire:
                 continue
             choices.append(((after_shanten, -after_ukeire, 1 if kind == "kan" else 0), option))
         return min(choices, default=((), None))[1]

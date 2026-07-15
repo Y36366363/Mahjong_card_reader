@@ -1,5 +1,12 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/15/2026
+
+- Added a dedicated advanced-AI behavior test suite covering tile efficiency, visible-tile ukeire, dora/value retention, genbutsu, suji, walls, honor safety, multi-riichi risk, rank-aware folding, yaku-safe calls, closed-tenpai preservation, and conservative kan rules.
+- Advanced AI visible-tile estimates now include public dora indicators.
+- Advanced AI now preserves a closed tenpai riichi route instead of opening for a value honor, and rejects an equal-shanten kan when it reduces effective remaining tiles.
+- Extracted rank/shanten folding policy into a directly testable decision function.
+
 ## Updates 7/13/2026
 
 - Reworked the interactive player view: every discard shows the hand, draw, all four rivers, scores, dealer, riichi, and each player's open-meld count.
