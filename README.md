@@ -7,6 +7,7 @@
 - Advanced AI now preserves a closed tenpai riichi route instead of opening for a value honor, and rejects an equal-shanten kan when it reduces effective remaining tiles.
 - Extracted rank/shanten folding policy into a directly testable decision function.
 - Added `benchmark_ai.py` for reproducible, seat-rotated comparisons of 1-advanced/3-simple, 2-advanced/2-simple, and 3-advanced/1-simple lineups, with console summaries and detailed JSON output.
+- Completed a 72-match/409-hand balanced benchmark (24 matches per lineup): advanced AI averaged 26,790 points and 2.29 rank versus simple AI's 23,210 points and 2.71 rank, with 202 versus 118 wins and 79 versus 162 deal-ins.
 
 ## Updates 7/13/2026
 
@@ -380,10 +381,10 @@ The tracker only uses information visible to the player: your hand, every river,
 
 These computers are deterministic heuristic agents; they do not require reinforcement-learning training.
 
-Run a balanced AI benchmark (16 games for each of the three lineups, 48 total):
+Run a balanced AI benchmark (24 games for each of the three lineups, 72 total):
 
 ```bash
-python benchmark_ai.py --games 16 --workers 4 --seed 800 \
+python benchmark_ai.py --games 24 --workers 4 --seed 800 \
   --json ai_benchmark.json
 ```
 
@@ -484,10 +485,10 @@ python main.py --mode game --language zh
 
 两种电脑均为确定性的启发式程序，不需要进行大量强化学习训练。
 
-运行公平轮换座位的电脑对照测试（每种阵容16场，共48场）：
+运行公平轮换座位的电脑对照测试（每种阵容24场，共72场）：
 
 ```bash
-python benchmark_ai.py --games 16 --workers 4 --seed 800 \
+python benchmark_ai.py --games 24 --workers 4 --seed 800 \
   --json ai_benchmark.json
 ```
 

@@ -108,7 +108,10 @@ def print_summary(summary: dict[str, Any]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark advanced/simple Mahjong AI matchups.")
-    parser.add_argument("--games", type=int, default=16, help="Games per matchup (default: 16)")
+    parser.add_argument(
+        "--games", type=int, default=24,
+        help="Games per matchup (default: 24; divisible by both 4 seats and 6 seat pairs)",
+    )
     parser.add_argument("--seed", type=int, default=800, help="First shared seed (default: 800)")
     parser.add_argument("--index-offset", type=int, default=0, help="Rotation index offset for batched runs")
     parser.add_argument("--workers", type=int, default=4, help="Parallel worker processes")
