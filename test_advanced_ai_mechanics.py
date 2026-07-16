@@ -4,7 +4,7 @@ import random
 import unittest
 from unittest.mock import patch
 
-from game import MahjongGame
+from game import MahjongGame, MeldState
 from tiles import index_to_tile
 
 
@@ -154,6 +154,74 @@ class DefenseTests(unittest.TestCase):
             self.assertIn("risk", candidate)
             self.assertIn("ukeire_total", candidate)
             self.assertIn("risk_tags", candidate)
+
+    def test_open_flush_and_toitoi_tendencies_affect_risk(self) -> None:
+        game = make_game()
+        opponent = game.players[1]
+        opponent.riichi = True
+        opponent.melds = [
+            MeldState("pon", ["2m"] * 3), MeldState("pon", ["8m"] * 3),
+        ]
+        visible = game._visible_counts(0)
+        same_suit = game._defense_risk_breakdown(0, "5m", [1], visible)
+        outside = game._defense_risk_breakdown(0, "5p", [1], visible)
+        honor = game._defense_risk_breakdown(0, "P", [1], visible)
+        self.assertGreater(float(same_suit["total"]), float(outside["total"]))
+        self.assertIn("flush-suit", same_suit["tags"])
+        self.assertIn("toitoi-terminal-honor", honor["tags"])
+
+
+class RiichiDecisionTests(unittest.TestCase):
+    def profile(self, **overrides: object) -> dict[str, object]:
+        result: dict[str, object] = {
+            "waits": [{"tile": "5m"}], "kinds": 1, "remaining": 2,
+            "good_wait": False, "dama_yaku": True,
+            "expected_points": 2600, "max_points": 2600,
+        }
+        result.update(overrides)
+        return result
+
+    def prepared(self) -> MahjongGame:
+        game = make_game()
+        game.players[0].hand = "1m 2m 3m 4m 5m 6m 2p 3p 4p 5s 6s 7s E".split()
+        return game
+
+    def test_bad_low_value_dama_wait_stays_dama(self) -> None:
+        game = self.prepared()
+        with patch.object(game, "_standard_shanten", return_value=0), \
+             patch.object(game, "_tenpai_profile", return_value=self.profile()):
+            self.assertFalse(game._should_declare_riichi(0))
+
+    def test_mangan_good_wait_declares_and_bad_chase_does_not(self) -> None:
+        game = self.prepared()
+        strong = self.profile(kinds=2, remaining=6, good_wait=True, expected_points=8000, max_points=8000)
+        with patch.object(game, "_standard_shanten", return_value=0), \
+             patch.object(game, "_tenpai_profile", return_value=strong):
+            self.assertTrue(game._should_declare_riichi(0))
+        game.players[1].riichi = True
+        weak = self.profile(dama_yaku=False, expected_points=3900, max_points=3900)
+        with patch.object(game, "_standard_shanten", return_value=0), \
+             patch.object(game, "_tenpai_profile", return_value=weak):
+            self.assertFalse(game._should_declare_riichi(0))
+
+    def test_late_dead_wait_and_large_lead_avoid_riichi(self) -> None:
+        game = self.prepared(); game.wall = ["1p"] * 8
+        with patch.object(game, "_standard_shanten", return_value=0), \
+             patch.object(game, "_tenpai_profile", return_value=self.profile()):
+            self.assertFalse(game._should_declare_riichi(0))
+        game.wall = ["1p"] * 30; game.players[0].points = 40_000
+        with patch.object(game, "_standard_shanten", return_value=0), \
+             patch.object(game, "_tenpai_profile", return_value=self.profile(expected_points=5200)):
+            self.assertFalse(game._should_declare_riichi(0))
+
+    def test_east_four_last_place_uses_required_points(self) -> None:
+        game = self.prepared(); game.round_hand = 3
+        game.players[0].points = 20_000
+        game.players[1].points = game.players[2].points = game.players[3].points = 25_000
+        enough = self.profile(expected_points=5200, max_points=5200)
+        with patch.object(game, "_standard_shanten", return_value=0), \
+             patch.object(game, "_tenpai_profile", return_value=enough):
+            self.assertTrue(game._should_declare_riichi(0))
 
 
 class CallAndKanTests(unittest.TestCase):

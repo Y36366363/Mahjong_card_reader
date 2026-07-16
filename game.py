@@ -519,9 +519,12 @@ class MahjongGame:
         # its later discard behaviour deterministic.
         p.hand.remove(discard)
         can_riichi = best_shanten == 0 and p.is_closed and not p.riichi and p.points >= 1000
-        declare = can_riichi and (
-            seat != 0 or not self.interactive or self._yes_no("Declare riichi?", False)
-        )
+        if can_riichi and seat == 0 and self.interactive:
+            declare = self._yes_no(self._t(
+                "Declare riichi?", "是否立直？", "リーチしますか？"
+            ), False)
+        else:
+            declare = can_riichi and self._should_declare_riichi(seat)
         if declare:
             p.riichi = True; p.points -= 1000; self.riichi_sticks += 1
             p.stats.riichi += 1
@@ -634,6 +637,26 @@ class MahjongGame:
             ):
                 one += 0.8
                 tags.add("near-dora")
+            tendency = self._opponent_meld_tendency(opponent)
+            flush_suit = tendency["flush_suit"]
+            if flush_suit is not None:
+                candidate_suit = tile[1] if len(tile) == 2 else None
+                if candidate_suit == flush_suit:
+                    one += 1.5
+                    tags.add("flush-suit")
+                elif i >= 27:
+                    one += 0.8
+                    tags.add("flush-honor")
+                else:
+                    one -= 0.8
+                    tags.add("outside-flush")
+            if tendency["toitoi"] and (i >= 27 or (i % 9) in {0, 8}):
+                one += 0.8
+                tags.add("toitoi-terminal-honor")
+            threat_points = self._estimated_threat_points(opponent)
+            one *= min(1.6, max(0.8, threat_points / (5800 if opponent == self.dealer else 3900)))
+            if threat_points >= 7700:
+                tags.add("high-value-threat")
             if opponent == self.dealer:
                 one *= 1.2
                 tags.add("dealer-threat")
@@ -643,19 +666,49 @@ class MahjongGame:
             risk += max(0.1, one)
         return {"total": risk, "tags": sorted(tags)}
 
+    def _opponent_meld_tendency(self, opponent: int) -> dict[str, object]:
+        melds = self.players[opponent].melds
+        suited = [tile[1] for meld in melds for tile in meld.tiles if len(tile) == 2]
+        flush_suit = None
+        if len(melds) >= 2 and suited and len(set(suited)) == 1:
+            flush_suit = suited[0]
+        triplets = sum(meld.kind in {"pon", "kan"} for meld in melds)
+        return {"flush_suit": flush_suit, "toitoi": triplets >= 2}
+
+    def _estimated_threat_points(self, opponent: int) -> int:
+        player = self.players[opponent]
+        base = 5800 if opponent == self.dealer else 3900
+        dora_tiles = {dora_from_indicator(indicator) for indicator in self.dora_indicators}
+        open_tiles = [tile for meld in player.melds for tile in meld.tiles]
+        dora_count = sum(tile in dora_tiles for tile in open_tiles)
+        tendency = self._opponent_meld_tendency(opponent)
+        estimate = base + dora_count * 1800
+        if tendency["flush_suit"] is not None:
+            estimate += 2000
+        if tendency["toitoi"]:
+            estimate += 1500
+        return estimate
+
     def _defense_risk(self, seat: int, tile: str, threats: list[int], visible: list[int]) -> float:
         return float(self._defense_risk_breakdown(seat, tile, threats, visible)["total"])
 
     def _defense_mode(
-        self, seat: int, shanten: int, threats: list[int], ukeire_total: int = 0
+        self, seat: int, shanten: int, threats: list[int], ukeire_total: int = 0,
+        hand_value: int = 0, good_wait: bool = False,
     ) -> str:
         """Return push, balanced, or fold for the current threat/hand context."""
         if not threats:
             return "push"
         rank = self._current_rank(seat)
+        ahead, needed = self._rank_gaps(seat)
         late_round = max((len(other.river) for other in self.players), default=0) >= 12
         multiple = len(threats) >= 2
         dealer_threat = self.dealer in threats
+        if self.round_hand == 3 and rank == 4:
+            if shanten <= 1 or (shanten == 2 and ukeire_total >= 16):
+                return "push" if hand_value >= needed or shanten == 0 else "balanced"
+        if self.round_hand == 3 and rank == 1 and ahead >= 8000 and shanten >= 1:
+            return "fold"
         if shanten >= 3:
             return "fold"
         if shanten == 2:
@@ -663,13 +716,17 @@ class MahjongGame:
                 return "balanced"
             return "fold"
         if shanten == 1:
-            if rank == 1 or (multiple and rank != 4):
+            if (rank == 1 and ahead >= 4000) or (multiple and rank != 4 and hand_value < 8000):
                 return "fold"
             if late_round and ukeire_total < 12:
                 return "fold"
             if dealer_threat or multiple or ukeire_total < 16:
                 return "balanced"
             return "push"
+        if hand_value >= 8000 and good_wait:
+            return "push"
+        if dealer_threat and not good_wait and hand_value < 3900:
+            return "fold" if rank == 1 else "balanced"
         if multiple and (rank == 1 or late_round):
             return "balanced"
         return "push"
@@ -677,6 +734,100 @@ class MahjongGame:
     def _current_rank(self, seat: int) -> int:
         order = sorted(range(4), key=lambda i: (-self.players[i].points, i))
         return order.index(seat) + 1
+
+    def _rank_gaps(self, seat: int) -> tuple[int, int]:
+        """Return points ahead of next place and points needed to overtake above."""
+        order = sorted(range(4), key=lambda i: (-self.players[i].points, i))
+        position = order.index(seat)
+        player_points = self.players[seat].points
+        ahead = player_points - self.players[order[position + 1]].points if position < 3 else 0
+        needed = self.players[order[position - 1]].points - player_points + 100 if position > 0 else 0
+        return ahead, needed
+
+    def _tenpai_profile(self, seat: int) -> dict[str, object]:
+        """Estimate wait width, shape, dama availability, and riichi ron value."""
+        player = self.players[seat]
+        if not player.is_closed or self._standard_shanten(player) != 0:
+            return {"waits": [], "kinds": 0, "remaining": 0, "good_wait": False,
+                    "dama_yaku": False, "expected_points": 0, "max_points": 0}
+        visible = self._visible_counts(seat)
+        waits: list[dict[str, object]] = []
+        old_riichi = player.riichi
+        for i in range(34):
+            remaining = max(0, 4 - visible[i])
+            if not remaining:
+                continue
+            tile = index_to_tile(i)
+            player.riichi = False
+            dama = self._try_score(seat, tile, "ron")
+            player.riichi = True
+            riichi_score = self._try_score(seat, tile, "ron")
+            if riichi_score is None:
+                continue
+            points = int(riichi_score.points.ron_points or 0)
+            waits.append({"tile": tile, "remaining": remaining, "points": points, "dama": dama is not None})
+        player.riichi = old_riichi
+        total = sum(int(wait["remaining"]) for wait in waits)
+        expected = (
+            sum(int(wait["remaining"]) * int(wait["points"]) for wait in waits) / total
+            if total else 0
+        )
+        # This is a practical wait-quality proxy. Multiple live wait types with at
+        # least four copies behaves like a good wait; single/near-dead waits do not.
+        good_wait = len(waits) >= 2 and total >= 4
+        return {
+            "waits": waits, "kinds": len(waits), "remaining": total,
+            "good_wait": good_wait, "dama_yaku": any(bool(wait["dama"]) for wait in waits),
+            "expected_points": int(expected),
+            "max_points": max((int(wait["points"]) for wait in waits), default=0),
+        }
+
+    def _rough_hand_value(self, seat: int) -> int:
+        player = self.players[seat]
+        dora_tiles = {dora_from_indicator(indicator) for indicator in self.dora_indicators}
+        dora_count = sum(tile in dora_tiles for tile in self._full_for_analysis(player))
+        seat_wind = WINDS[(seat - self.dealer) % 4]
+        value_tiles = {"P", "F", "C", "E", seat_wind}
+        yakuhai = sum(
+            meld.kind in {"pon", "kan"} and meld.tiles[0] in value_tiles for meld in player.melds
+        )
+        return 2000 + dora_count * 1000 + yakuhai * 1000
+
+    def _should_declare_riichi(self, seat: int) -> bool:
+        player = self.players[seat]
+        if not player.is_closed or player.points < 1000 or self._standard_shanten(player) != 0:
+            return False
+        profile = self._tenpai_profile(seat)
+        if not profile["waits"]:
+            return False
+        rank = self._current_rank(seat)
+        ahead, needed = self._rank_gaps(seat)
+        remaining_wall = len(self.wall)
+        threats = [i for i, other in enumerate(self.players) if i != seat and other.riichi]
+        good_wait = bool(profile["good_wait"])
+        live = int(profile["remaining"])
+        expected = int(profile["expected_points"])
+        dama_yaku = bool(profile["dama_yaku"])
+
+        # Very late or nearly dead waits should not spend a stick unless the hand
+        # needs riichi as its only yaku or the final-hand placement requires action.
+        if remaining_wall <= 8 and live <= 2 and not (self.round_hand == 3 and rank == 4):
+            return not dama_yaku and live > 0 and expected >= 3900
+        # In East 4, placement requirements override generic aggression.
+        if self.round_hand == 3:
+            if rank == 1:
+                return good_wait and expected >= 8000 and ahead >= 8000 and not threats
+            if rank == 4:
+                return expected >= needed or not dama_yaku
+        # A narrow low-value dama hand should stay quiet, especially while leading.
+        if dama_yaku and not good_wait and expected < 3900:
+            return False
+        if rank == 1 and ahead >= 8000 and (not good_wait or expected < 5200):
+            return False
+        # Chasing riichi requires either a useful wait or meaningful value.
+        if threats and not good_wait and expected < 5200:
+            return False
+        return live >= 2 and (good_wait or expected >= 3900 or not dama_yaku)
 
     def _should_fold(self, seat: int, shanten: int, threats: list[int]) -> bool:
         """Decide whether rank and distance justify switching to defense."""
@@ -698,18 +849,36 @@ class MahjongGame:
             if shanten == best_shanten:
                 player.hand.remove(tile)
                 kinds, total = self._ukeire(player, visible)
+                # Full scoring is comparatively expensive. Wait/value details only
+                # affect discard selection while deciding whether to push against
+                # an active riichi; the selected hand is evaluated again by the
+                # separate riichi decision after the discard.
+                profile = self._tenpai_profile(seat) if shanten == 0 and threats else None
                 player.hand.append(tile); player.sort()
+            else:
+                profile = None
             defense = self._defense_risk_breakdown(seat, tile, threats, visible)
             candidates.append({
                 "tile": tile, "shanten": shanten, "ukeire_kinds": kinds,
                 "ukeire_total": total, "risk": defense["total"],
                 "risk_tags": defense["tags"], "tile_value": self._tile_value(seat, tile),
+                "estimated_points": int(profile["expected_points"]) if profile else self._rough_hand_value(seat),
+                "good_wait": bool(profile["good_wait"]) if profile else False,
             })
         best_ukeire = max(
             (int(candidate["ukeire_total"]) for candidate in candidates if candidate["shanten"] == best_shanten),
             default=0,
         )
-        mode = self._defense_mode(seat, best_shanten, threats, best_ukeire)
+        best_value = max(
+            (int(candidate["estimated_points"]) for candidate in candidates if candidate["shanten"] == best_shanten),
+            default=0,
+        )
+        any_good_wait = any(
+            bool(candidate["good_wait"]) for candidate in candidates if candidate["shanten"] == best_shanten
+        )
+        mode = self._defense_mode(
+            seat, best_shanten, threats, best_ukeire, best_value, any_good_wait
+        )
         if mode == "fold":
             chosen = min(candidates, key=lambda c: (
                 float(c["risk"]), int(c["shanten"]), float(c["tile_value"]), tile_to_index(str(c["tile"]))
@@ -999,6 +1168,11 @@ class MahjongGame:
                         "dora": ("dora", "宝牌", "ドラ"), "near-dora": ("near-dora", "宝牌周边", "ドラそば"),
                         "dealer-threat": ("dealer-threat", "庄家威胁", "親リーチ"),
                         "late-round": ("late-round", "晚巡", "終盤"),
+                        "flush-suit": ("flush-suit", "染手同色", "染め手同色"),
+                        "flush-honor": ("flush-honor", "染手字牌", "染め手字牌"),
+                        "outside-flush": ("outside-flush", "染手外安全", "染め手外側"),
+                        "toitoi-terminal-honor": ("toitoi-terminal-honor", "对对和幺九风险", "対々和么九牌リスク"),
+                        "high-value-threat": ("high-value-threat", "高打点威胁", "高打点脅威"),
                     }
                     language_index = {"en": 0, "zh": 1, "ja": 2}[self.language]
                     tags = ",".join(

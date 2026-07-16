@@ -6,6 +6,8 @@
 - Added dealer-threat, dora, near-dora, one-chance, late-round, multi-riichi, rank, shanten, and remaining-ukeire context to defensive decisions.
 - Added `advanced_discard_report()` with per-candidate shanten, ukeire, danger score, safety/danger tags, and selected decision mode; hint mode now shows the top candidates.
 - Fixed tied-score rank handling: players now receive stable unique current ranks instead of all treating themselves as first place.
+- Added open-meld tendency reads (flush/toitoi), estimated opponent hand value, and stronger dealer/late-round threat weighting.
+- Added an explicit riichi decision layer using wait quality, visible remaining tiles, estimated hand value, dama yaku, chase-riichi pressure, current rank/score gaps, East-4 comeback requirements, and remaining wall size.
 
 ## Updates 7/15/2026
 
@@ -403,6 +405,15 @@ suji, walls, one-chance shapes, exhausted honors, dora/near-dora, dealer riichi,
 multiple threats, and late-round pressure. Hint mode exposes these values so the
 decision can be audited instead of behaving like a black box.
 
+Riichi is decided separately from discard selection. The AI estimates legal waits,
+visible remaining copies, rough ron value, wait quality, and whether the hand already
+has a dama yaku. It is more willing to riichi a good mangan-class wait, but may stay
+dama with a cheap bad wait, avoid a weak chase against a dealer, protect a sufficient
+lead, or decline a nearly dead late-round riichi. In East 4 it compares the expected
+gain with the score needed to improve rank, so a last-place player can push for a
+realistic comeback while a leader accounts for the gap to second place and the
+1,000-point riichi-stick risk.
+
 Run a balanced AI benchmark (24 games for each of the three lineups, 72 total):
 
 ```bash
@@ -516,6 +527,8 @@ python main.py --mode game --language zh
 - `完全弃和`：安全度优先，必要时允许向听数变差以避免放铳。
 
 模式选择会综合当前向听、剩余有效牌、当前顺位、巡目、立直人数以及庄家是否构成威胁。单张牌危险度会根据现物、筋、壁、一枚机会、接近打光的字牌、宝牌、宝牌周边、庄家立直、多家威胁和晚巡进行修正。提示模式会显示这些候选数据，使高级电脑的决定可以被检查，而不是黑箱选择。
+
+高级电脑也会单独判断是否立直，而不是听牌后一律立直。判断会综合合法待牌、根据可见牌计算的剩余张数、好型或愚型、预估荣和打点、是否已有默听役、追立直对象是否为庄家、剩余牌山、当前顺位和点差。满贯级好型听牌会更积极；低打点愚型面对庄家立直、晚巡接近枯竭的待牌、或大幅领先时则可能默听。东四会比较“提升顺位所需点数”，末位会为可实现的逆转更积极进攻，第一名则会结合与第二名的点差及一千点立直棒风险决定是否保守。
 
 运行公平轮换座位的电脑对照测试（每种阵容24场，共72场）：
 
