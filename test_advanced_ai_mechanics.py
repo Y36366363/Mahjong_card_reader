@@ -107,6 +107,54 @@ class DefenseTests(unittest.TestCase):
         self.assertFalse(game._should_fold(0, 1, threats))
         self.assertTrue(game._should_fold(0, 2, threats))
 
+    def test_tied_scores_have_stable_unique_ranks(self) -> None:
+        game = make_game()
+        self.assertEqual([game._current_rank(i) for i in range(4)], [1, 2, 3, 4])
+
+    def test_dealer_dora_and_late_round_raise_danger(self) -> None:
+        game = make_game()
+        game.dealer = 1
+        game.players[1].riichi = True
+        visible = game._visible_counts(0)
+        dealer = game._defense_risk(0, "5p", [1], visible)
+        game.dealer = 2
+        nondealer = game._defense_risk(0, "5p", [1], visible)
+        self.assertGreater(dealer, nondealer)
+        self.assertGreater(
+            game._defense_risk(0, "5m", [1], visible),
+            game._defense_risk(0, "5p", [1], visible),
+        )
+        early = game._defense_risk(0, "5p", [1], visible)
+        game.players[2].river = ["1s"] * 12
+        late = game._defense_risk(0, "5p", [1], game._visible_counts(0))
+        self.assertGreater(late, early)
+
+    def test_push_balanced_and_fold_modes(self) -> None:
+        game = make_game()
+        game.players[1].riichi = True
+        self.assertEqual(game._defense_mode(0, 0, [1], 8), "push")
+        game.players[0].points = 20_000
+        game.players[1].points = game.players[2].points = game.players[3].points = 28_000
+        self.assertEqual(game._defense_mode(0, 1, [1], 10), "balanced")
+        self.assertEqual(game._defense_mode(0, 3, [1], 30), "fold")
+        game.players[0].points = 15_000
+        game.players[1].points = game.players[2].points = game.players[3].points = 28_000
+        self.assertEqual(game._defense_mode(0, 2, [1], 24), "balanced")
+
+    def test_explainable_report_contains_candidate_metrics(self) -> None:
+        game = make_game()
+        player = game.players[0]
+        player.hand = "1m 2m 4m 5m 7m 8m 1p 2p 4p 5p 7s 8s E E".split()
+        game.players[1].riichi = True
+        report = game.advanced_discard_report(0)
+        self.assertIn(report["mode"], {"push", "balanced", "fold"})
+        self.assertIn(report["chosen"], player.hand)
+        self.assertTrue(report["candidates"])
+        for candidate in report["candidates"]:
+            self.assertIn("risk", candidate)
+            self.assertIn("ukeire_total", candidate)
+            self.assertIn("risk_tags", candidate)
+
 
 class CallAndKanTests(unittest.TestCase):
     def test_unknown_yaku_call_is_rejected(self) -> None:

@@ -1,5 +1,12 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/16/2026
+
+- Replaced the advanced AI's binary push/fold switch with three explainable modes: `push`, `balanced`, and `fold`.
+- Added dealer-threat, dora, near-dora, one-chance, late-round, multi-riichi, rank, shanten, and remaining-ukeire context to defensive decisions.
+- Added `advanced_discard_report()` with per-candidate shanten, ukeire, danger score, safety/danger tags, and selected decision mode; hint mode now shows the top candidates.
+- Fixed tied-score rank handling: players now receive stable unique current ranks instead of all treating themselves as first place.
+
 ## Updates 7/15/2026
 
 - Added a dedicated advanced-AI behavior test suite covering tile efficiency, visible-tile ukeire, dora/value retention, genbutsu, suji, walls, honor safety, multi-riichi risk, rank-aware folding, yaku-safe calls, closed-tenpai preservation, and conservative kan rules.
@@ -381,6 +388,21 @@ The tracker only uses information visible to the player: your hand, every river,
 
 These computers are deterministic heuristic agents; they do not require reinforcement-learning training.
 
+#### Advanced AI push/fold details
+
+The advanced AI uses three defensive modes:
+
+- `push`: preserve minimum shanten and maximize remaining effective tiles; danger is a secondary tie-breaker.
+- `balanced`: preserve the best shanten, then prefer the safer discard before comparing effective tiles.
+- `fold`: select safety first and may accept a worse shanten to avoid dealing in.
+
+Mode selection considers current shanten, remaining effective tiles, current rank,
+round progress, number of riichi opponents, and whether the dealer is threatening.
+Individual tile danger starts from a neutral risk and is adjusted by genbutsu,
+suji, walls, one-chance shapes, exhausted honors, dora/near-dora, dealer riichi,
+multiple threats, and late-round pressure. Hint mode exposes these values so the
+decision can be audited instead of behaving like a black box.
+
 Run a balanced AI benchmark (24 games for each of the three lineups, 72 total):
 
 ```bash
@@ -484,6 +506,16 @@ python main.py --mode game --language zh
 - **高级电脑**：进一步考虑有效进张、剩余牌数、宝牌与役牌保留、现物、筋、壁、字牌安全度、当前排名、弃和判断、副露收益和杠牌风险。
 
 两种电脑均为确定性的启发式程序，不需要进行大量强化学习训练。
+
+#### 高级电脑押引机制
+
+高级电脑现在使用三档防守模式：
+
+- `进攻`：保持最低向听并优先最大化剩余有效牌，危险度只作为次要比较。
+- `平衡押引`：保持最佳向听，但在同向听候选中先选择更安全的牌，再比较有效进张。
+- `完全弃和`：安全度优先，必要时允许向听数变差以避免放铳。
+
+模式选择会综合当前向听、剩余有效牌、当前顺位、巡目、立直人数以及庄家是否构成威胁。单张牌危险度会根据现物、筋、壁、一枚机会、接近打光的字牌、宝牌、宝牌周边、庄家立直、多家威胁和晚巡进行修正。提示模式会显示这些候选数据，使高级电脑的决定可以被检查，而不是黑箱选择。
 
 运行公平轮换座位的电脑对照测试（每种阵容24场，共72场）：
 

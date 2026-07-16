@@ -590,73 +590,146 @@ class MahjongGame:
                 value -= 0.3
         return value
 
-    def _defense_risk(self, seat: int, tile: str, threats: list[int], visible: list[int]) -> float:
+    def _defense_risk_breakdown(
+        self, seat: int, tile: str, threats: list[int], visible: list[int]
+    ) -> dict[str, object]:
         if not threats:
-            return 0.0
+            return {"total": 0.0, "tags": ["no-threat"]}
         i = tile_to_index(tile)
         risk = 0.0
+        tags: set[str] = set()
+        dora_indices = {tile_to_index(dora_from_indicator(x)) for x in self.dora_indicators}
+        late_round = max((len(player.river) for player in self.players), default=0) >= 12
         for opponent in threats:
             river = self.players[opponent].river
             if tile in river:  # genbutsu
+                tags.add("genbutsu")
                 continue
             one = 5.0
             if i >= 27:
                 one = max(0.3, 3.2 - visible[i])  # exhausted honors become safer
+                tags.add("honor")
+                if visible[i] >= 3:
+                    tags.add("exhausted-honor")
             else:
                 pos = i % 9
                 river_pos = {tile_to_index(x) % 9 for x in river if tile_to_index(x) // 9 == i // 9}
                 # Basic suji: 1/4/7, 2/5/8, 3/6/9 relationships.
                 if any(abs(pos - r) == 3 for r in river_pos):
                     one -= 2.0
-                # A complete adjacent wall reduces sequence danger.
+                    tags.add("suji")
+                # A complete wall or one-chance adjacent tile reduces sequence danger.
                 neighbors = [j for j in (i - 1, i + 1) if 0 <= j < 27 and j // 9 == i // 9]
                 if any(visible[j] >= 4 for j in neighbors):
                     one -= 1.2
+                    tags.add("wall")
+                elif any(visible[j] == 3 for j in neighbors):
+                    one -= 0.5
+                    tags.add("one-chance")
+            if i in dora_indices:
+                one += 2.5
+                tags.add("dora")
+            elif i < 27 and any(
+                d < 27 and d // 9 == i // 9 and abs(d - i) == 1 for d in dora_indices
+            ):
+                one += 0.8
+                tags.add("near-dora")
+            if opponent == self.dealer:
+                one *= 1.2
+                tags.add("dealer-threat")
+            if late_round:
+                one *= 1.1
+                tags.add("late-round")
             risk += max(0.1, one)
-        return risk
+        return {"total": risk, "tags": sorted(tags)}
+
+    def _defense_risk(self, seat: int, tile: str, threats: list[int], visible: list[int]) -> float:
+        return float(self._defense_risk_breakdown(seat, tile, threats, visible)["total"])
+
+    def _defense_mode(
+        self, seat: int, shanten: int, threats: list[int], ukeire_total: int = 0
+    ) -> str:
+        """Return push, balanced, or fold for the current threat/hand context."""
+        if not threats:
+            return "push"
+        rank = self._current_rank(seat)
+        late_round = max((len(other.river) for other in self.players), default=0) >= 12
+        multiple = len(threats) >= 2
+        dealer_threat = self.dealer in threats
+        if shanten >= 3:
+            return "fold"
+        if shanten == 2:
+            if rank == 4 and not late_round and not multiple and ukeire_total >= 20:
+                return "balanced"
+            return "fold"
+        if shanten == 1:
+            if rank == 1 or (multiple and rank != 4):
+                return "fold"
+            if late_round and ukeire_total < 12:
+                return "fold"
+            if dealer_threat or multiple or ukeire_total < 16:
+                return "balanced"
+            return "push"
+        if multiple and (rank == 1 or late_round):
+            return "balanced"
+        return "push"
+
+    def _current_rank(self, seat: int) -> int:
+        order = sorted(range(4), key=lambda i: (-self.players[i].points, i))
+        return order.index(seat) + 1
 
     def _should_fold(self, seat: int, shanten: int, threats: list[int]) -> bool:
         """Decide whether rank and distance justify switching to defense."""
-        if not threats:
-            return False
-        player = self.players[seat]
-        rank = 1 + sum(other.points > player.points for other in self.players)
-        return shanten >= 2 or (rank == 1 and shanten >= 1)
+        return self._defense_mode(seat, shanten, threats) == "fold"
 
-    def _choose_advanced_discard(self, seat: int) -> str:
-        p = self.players[seat]
+    def advanced_discard_report(self, seat: int) -> dict[str, object]:
+        """Return an explainable advanced-AI discard decision."""
+        player = self.players[seat]
         visible = self._visible_counts(seat)
         threats = [i for i, other in enumerate(self.players) if i != seat and other.riichi]
         shanten_by_tile = {
-            tile: self._shanten_after_discard(p, tile)
-            for tile in sorted(set(p.hand), key=tile_sort_key)
+            tile: self._shanten_after_discard(player, tile)
+            for tile in sorted(set(player.hand), key=tile_sort_key)
         }
         best_shanten = min(shanten_by_tile.values())
-        fold = self._should_fold(seat, best_shanten, threats)
-        if fold:
-            return min(
-                shanten_by_tile,
-                key=lambda tile: (
-                    self._defense_risk(seat, tile, threats, visible),
-                    shanten_by_tile[tile],
-                    self._tile_value(seat, tile),
-                    tile_to_index(tile),
-                ),
-            )
+        candidates: list[dict[str, object]] = []
+        for tile, shanten in shanten_by_tile.items():
+            kinds = total = 0
+            if shanten == best_shanten:
+                player.hand.remove(tile)
+                kinds, total = self._ukeire(player, visible)
+                player.hand.append(tile); player.sort()
+            defense = self._defense_risk_breakdown(seat, tile, threats, visible)
+            candidates.append({
+                "tile": tile, "shanten": shanten, "ukeire_kinds": kinds,
+                "ukeire_total": total, "risk": defense["total"],
+                "risk_tags": defense["tags"], "tile_value": self._tile_value(seat, tile),
+            })
+        best_ukeire = max(
+            (int(candidate["ukeire_total"]) for candidate in candidates if candidate["shanten"] == best_shanten),
+            default=0,
+        )
+        mode = self._defense_mode(seat, best_shanten, threats, best_ukeire)
+        if mode == "fold":
+            chosen = min(candidates, key=lambda c: (
+                float(c["risk"]), int(c["shanten"]), float(c["tile_value"]), tile_to_index(str(c["tile"]))
+            ))
+        elif mode == "balanced":
+            shortlist = [candidate for candidate in candidates if candidate["shanten"] == best_shanten]
+            chosen = min(shortlist, key=lambda c: (
+                float(c["risk"]), -int(c["ukeire_total"]), -int(c["ukeire_kinds"]),
+                float(c["tile_value"]), tile_to_index(str(c["tile"]))
+            ))
+        else:
+            shortlist = [candidate for candidate in candidates if candidate["shanten"] == best_shanten]
+            chosen = min(shortlist, key=lambda c: (
+                -int(c["ukeire_total"]), -int(c["ukeire_kinds"]), float(c["risk"]) * 0.35,
+                float(c["tile_value"]), tile_to_index(str(c["tile"]))
+            ))
+        return {"mode": mode, "threats": threats, "chosen": chosen["tile"], "candidates": candidates}
 
-        # Ukeire is the expensive part of evaluation. Only equal-best-shanten
-        # discards can win, so avoid evaluating candidates that are already slower.
-        shortlist = [tile for tile, sh in shanten_by_tile.items() if sh == best_shanten]
-        candidates: list[tuple[tuple[float, ...], str]] = []
-        for tile in shortlist:
-            p.hand.remove(tile)
-            kinds, total = self._ukeire(p, visible)
-            p.hand.append(tile); p.sort()
-            risk = self._defense_risk(seat, tile, threats, visible)
-            value = self._tile_value(seat, tile)
-            key = (-float(total), -float(kinds), risk * 0.35, value, float(tile_to_index(tile)))
-            candidates.append((key, tile))
-        return min(candidates)[1]
+    def _choose_advanced_discard(self, seat: int) -> str:
+        return str(self.advanced_discard_report(seat)["chosen"])
 
     def _call_options(self, caller: int, discarder: int, tile: str) -> list[tuple[str, list[str]]]:
         p = self.players[caller]
@@ -791,7 +864,7 @@ class MahjongGame:
         if p.riichi:
             return None
         threats = any(i != caller and other.riichi for i, other in enumerate(self.players))
-        rank = 1 + sum(other.points > p.points for other in self.players)
+        rank = self._current_rank(caller)
         before_shanten = self._standard_shanten(p)
         before_visible = self._visible_counts(caller)
         before_ukeire = self._ukeire(p, before_visible)[1]
@@ -879,7 +952,8 @@ class MahjongGame:
             print(self._t(f"Melds: {melds}", f"副露：{melds}"))
         if self.assist_mode == "hint":
             shanten = self._standard_shanten(p)
-            recommendation = draw if p.riichi else self._choose_advanced_discard(0)
+            report = None if p.riichi else self.advanced_discard_report(0)
+            recommendation = draw if p.riichi else str(report["chosen"])
             after = self._shanten_after_discard(p, recommendation)
             visible = self._visible_counts(0)
             p.hand.remove(recommendation)
@@ -887,12 +961,58 @@ class MahjongGame:
             p.hand.append(recommendation); p.sort()
             print(self._t("Hint:", "提示："))
             print(self._t(f"  Current shanten: {shanten}", f"  当前向听数：{shanten}"))
+            if report is not None:
+                mode = str(report["mode"])
+                mode_display = {
+                    "push": self._t("push", "进攻", "押し"),
+                    "balanced": self._t("balanced", "平衡押引", "押し引き"),
+                    "fold": self._t("fold", "完全弃和", "ベタオリ"),
+                }[mode]
+                print(self._t(
+                    f"  Decision mode: {mode_display}",
+                    f"  决策模式：{mode_display}",
+                    f"  判断モード：{mode_display}",
+                ))
             print(self._t(
                 f"  Recommended discard: {recommendation} (after: {after} shanten, "
                 f"{kinds} effective types / {total} visible-adjusted tiles)",
                 f"  推荐弃牌：{recommendation}（弃牌后{after}向听，"
                 f"{kinds}种有效牌／按可见牌修正后共{total}张）",
             ))
+            if report is not None:
+                candidates = sorted(
+                    report["candidates"],
+                    key=lambda c: (
+                        0 if c["tile"] == recommendation else 1,
+                        int(c["shanten"]), -int(c["ukeire_total"]), float(c["risk"]),
+                    ),
+                )[:3]
+                print(self._t("  Top candidates:", "  候选牌对比：", "  候補比較："))
+                for candidate in candidates:
+                    tag_names = {
+                        "no-threat": ("no-threat", "无威胁", "脅威なし"),
+                        "genbutsu": ("genbutsu", "现物", "現物"),
+                        "suji": ("suji", "筋", "スジ"), "wall": ("wall", "壁", "壁"),
+                        "one-chance": ("one-chance", "一枚机会", "ワンチャンス"),
+                        "honor": ("honor", "字牌", "字牌"),
+                        "exhausted-honor": ("exhausted-honor", "字牌接近打光", "字牌枯れ"),
+                        "dora": ("dora", "宝牌", "ドラ"), "near-dora": ("near-dora", "宝牌周边", "ドラそば"),
+                        "dealer-threat": ("dealer-threat", "庄家威胁", "親リーチ"),
+                        "late-round": ("late-round", "晚巡", "終盤"),
+                    }
+                    language_index = {"en": 0, "zh": 1, "ja": 2}[self.language]
+                    tags = ",".join(
+                        tag_names.get(str(tag), (str(tag), str(tag), str(tag)))[language_index]
+                        for tag in candidate["risk_tags"]
+                    ) or "-"
+                    print(self._t(
+                        f"    {candidate['tile']}: shanten={candidate['shanten']}, "
+                        f"ukeire={candidate['ukeire_total']}, risk={float(candidate['risk']):.1f}, {tags}",
+                        f"    {candidate['tile']}：向听={candidate['shanten']}，"
+                        f"进张={candidate['ukeire_total']}，危险度={float(candidate['risk']):.1f}，{tags}",
+                        f"    {candidate['tile']}：シャンテン={candidate['shanten']}、"
+                        f"受け入れ={candidate['ukeire_total']}、危険度={float(candidate['risk']):.1f}、{tags}",
+                    ))
             counter = RemainingTileCounter()
             known = p.hand.copy() + self.dora_indicators
             for player in self.players:
