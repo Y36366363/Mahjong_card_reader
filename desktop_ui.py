@@ -22,6 +22,8 @@ COLORS = {
     "tile": "#fffdf4",
 }
 
+TABLE_POSITIONS = {0: (2, 1), 1: (1, 2), 2: (0, 1), 3: (1, 0)}
+
 
 def classify_prompt(prompt: str) -> str:
     text = prompt.lower()
@@ -147,8 +149,9 @@ class MahjongDesktopApp:
         left.grid_columnconfigure(2, weight=1)
         left.grid_rowconfigure(1, weight=1)
         self.player_labels: list[tk.Label | None] = [None] * 4
-        positions = ((2, 2, 1), (1, 1, 2), (3, 1, 0), (0, 0, 1))
-        for seat, row, column in positions:
+        # Human perspective: self at the bottom, opposite player at the top,
+        # kamicha (seat 3) on the left, and shimocha (seat 1) on the right.
+        for seat, (row, column) in TABLE_POSITIONS.items():
             label = tk.Label(
                 left, justify="left", anchor="nw", bg=COLORS["panel"], fg=COLORS["ink"],
                 font=("Arial", 10), padx=10, pady=8, relief="ridge", bd=2,

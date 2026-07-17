@@ -3,10 +3,16 @@ from __future__ import annotations
 import queue
 import unittest
 
-from desktop_ui import QueueWriter, classify_prompt
+from desktop_ui import TABLE_POSITIONS, QueueWriter, classify_prompt
 
 
 class DesktopUIAdapterTests(unittest.TestCase):
+    def test_human_seat_is_at_the_bottom_of_the_table(self) -> None:
+        self.assertEqual(TABLE_POSITIONS[0], (2, 1))
+        self.assertEqual(TABLE_POSITIONS[2], (0, 1))
+        self.assertEqual(TABLE_POSITIONS[3], (1, 0))
+        self.assertEqual(TABLE_POSITIONS[1], (1, 2))
+
     def test_prompt_classification_covers_game_actions(self) -> None:
         self.assertEqual(classify_prompt("Discard tile (or index): "), "discard")
         self.assertEqual(classify_prompt("请输入要打出的牌或编号："), "discard")
