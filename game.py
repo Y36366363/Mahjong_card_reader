@@ -75,12 +75,15 @@ class PlayerStats:
     riichi_decisions: int = 0
     riichi_decision_seconds: float = 0.0
     call_decision_seconds: float = 0.0
+    temperature_choices: int = 0
+    temperature_alternatives: int = 0
 
 
 @dataclass
 class PlayerState:
     name: str
     ai_level: str = "simple"
+    ai_temperature: float = 0.0
     points: int = 25_000
     hand: list[str] = field(default_factory=list)
     melds: list[MeldState] = field(default_factory=list)
@@ -112,6 +115,7 @@ class MahjongGame:
         seed: int | None = None,
         interactive: bool = True,
         ai_levels: list[str] | None = None,
+        ai_temperatures: float | list[float] | None = None,
         assist_mode: str | None = None,
         language: str = "en",
     ) -> None:
@@ -132,10 +136,22 @@ class MahjongGame:
         levels = ai_levels or ["simple"] * 4
         if len(levels) != 4 or any(level not in {"simple", "advanced"} for level in levels):
             raise ValueError("ai_levels must contain four values: simple or advanced.")
+        if ai_temperatures is None:
+            temperatures = [0.0] * 4
+        elif isinstance(ai_temperatures, (int, float)):
+            temperatures = [float(ai_temperatures)] * 4
+        else:
+            temperatures = [float(value) for value in ai_temperatures]
+        if len(temperatures) != 4 or any(not 0.0 <= value <= 1.0 for value in temperatures):
+            raise ValueError("ai_temperatures must be a number or four values from 0 to 1.")
         self.players = [
-            PlayerState(name, ai_level=level)
-            for name, level in zip(("You", "AI-1", "AI-2", "AI-3"), levels)
+            PlayerState(name, ai_level=level, ai_temperature=temperature)
+            for name, level, temperature in zip(
+                ("You", "AI-1", "AI-2", "AI-3"), levels, temperatures
+            )
         ]
+        decision_seed = seed if seed is not None else random.SystemRandom().getrandbits(64)
+        self._decision_rngs = [random.Random(f"{decision_seed}:decision:{seat}") for seat in range(4)]
         self.dealer = 0
         self.round_hand = 0
         self.honba = 0
@@ -259,7 +275,7 @@ class MahjongGame:
             f"{self._name(p)}=" + (
                 (("高级" if p.ai_level == "advanced" else "简单") if self.language == "zh" else
                  ("上級" if p.ai_level == "advanced" else "初級") if self.language == "ja" else p.ai_level)
-            )
+            ) + (f"(T={p.ai_temperature:g})" if p.ai_level == "advanced" else "")
             for p in self.players
         )
         if self.language == "zh":
@@ -967,7 +983,55 @@ class MahjongGame:
             mode = str(report["mode"])
             setattr(stats, f"defense_{mode}", getattr(stats, f"defense_{mode}") + 1)
             self._hand_threat_modes[seat].add(mode)
-        return str(report["chosen"])
+        chosen = self._temperature_discard_choice(seat, report)
+        return str(chosen)
+
+    def _temperature_discard_choice(self, seat: int, report: dict[str, object]) -> str:
+        """Randomize only among candidates close enough to preserve AI strength."""
+        player = self.players[seat]
+        temperature = player.ai_temperature
+        deterministic = str(report["chosen"])
+        if temperature <= 0:
+            return deterministic
+        candidates = list(report["candidates"])
+        selected = next(candidate for candidate in candidates if candidate["tile"] == deterministic)
+        mode = str(report["mode"])
+        if mode == "push":
+            eligible = [candidate for candidate in candidates if (
+                candidate["shanten"] == selected["shanten"]
+                and int(candidate["ukeire_total"]) >= int(selected["ukeire_total"]) - max(1, round(2 * temperature))
+                and int(candidate["ukeire_kinds"]) >= int(selected["ukeire_kinds"]) - 1
+                and float(candidate["risk"]) <= float(selected["risk"]) + 0.8 * temperature
+                and float(candidate["tile_value"]) <= float(selected["tile_value"]) + 0.5 * temperature
+            )]
+        elif mode == "balanced":
+            eligible = [candidate for candidate in candidates if (
+                candidate["shanten"] == selected["shanten"]
+                and float(candidate["risk"]) <= float(selected["risk"]) + 0.35 * temperature
+                and int(candidate["ukeire_total"]) >= int(selected["ukeire_total"]) - max(1, round(2 * temperature))
+                and float(candidate["tile_value"]) <= float(selected["tile_value"]) + 0.5 * temperature
+            )]
+        else:
+            eligible = [candidate for candidate in candidates if (
+                candidate["shanten"] == selected["shanten"]
+                and float(candidate["risk"]) <= float(selected["risk"]) + 0.2 * temperature
+                and float(candidate["tile_value"]) <= float(selected["tile_value"]) + 0.5 * temperature
+            )]
+        if len(eligible) <= 1:
+            return deterministic
+        # The deterministic best retains the largest weight. Temperature controls
+        # how often the close alternatives are explored, not which moves are legal.
+        weights: list[float] = []
+        for candidate in eligible:
+            if candidate["tile"] == deterministic:
+                weights.append(1.0)
+            else:
+                weights.append(0.02 + 0.48 * temperature * temperature)
+        player.stats.temperature_choices += 1
+        choice = self._decision_rngs[seat].choices(eligible, weights=weights, k=1)[0]
+        if choice["tile"] != deterministic:
+            player.stats.temperature_alternatives += 1
+        return str(choice["tile"])
 
     def _call_options(self, caller: int, discarder: int, tile: str) -> list[tuple[str, list[str]]]:
         p = self.players[caller]

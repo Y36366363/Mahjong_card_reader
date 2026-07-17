@@ -7,6 +7,8 @@
 - Tightened value-honor calls that keep the same shanten: opening now requires a meaningful effective-tile gain instead of merely avoiding a large loss.
 - Removed repeated shanten and tile-value work from advanced discard analysis; interactive decisions remain around tens of milliseconds on the current benchmark machine.
 - A fixed-seed 12-match before/after check improved advanced-AI average points from 26,804 to 28,296 and average rank from 2.33 to 2.17. This is a diagnostic sample, not a statistically conclusive strength rating.
+- Added constrained per-seat AI temperature (`0` to `1`). It randomizes only among near-equivalent, policy-safe discards, uses a decision RNG independent from the wall, and remains reproducible with a fixed seed.
+- In a 72-match temperature comparison, average points were 26,685/26,729/26,679 at temperatures `0`/`0.2`/`0.5`. The guarded randomizer changed 4.2% of eligible decisions at `0.2` and 16.4% at `0.5`; aggregate strength stayed essentially flat, while `0.5` showed slightly more fourth-place variance. `0.2` is the recommended default for light style variety.
 
 ## Updates 7/16/2026
 
@@ -333,6 +335,7 @@ Useful options:
 - `--assist-mode normal`: shows the table without strategic recommendations.
 - `--assist-mode hint`: enables shanten, discard, effective-tile, and tile-tracker hints.
 - `--ai-levels simple,advanced,advanced,simple`: selects one computer level for each seat in `You,AI-1,AI-2,AI-3` order. In an interactive game, the first seat remains user-controlled.
+- `--ai-temperature 0.2`: controls constrained advanced-AI style variation. `0` is fully deterministic; `0.2` is recommended; high values create more variety and variance.
 - `--auto-game`: lets the computer control all four seats for testing or simulation.
 - `--language en|zh|ja`: selects English, Chinese, or Japanese game UI.
 
@@ -345,7 +348,8 @@ The same settings can be stored in JSON:
   "game": {
     "seed": 2026,
     "assist_mode": "hint",
-    "ai_levels": ["simple", "advanced", "advanced", "simple"]
+    "ai_levels": ["simple", "advanced", "advanced", "simple"],
+    "ai_temperature": [0.0, 0.2, 0.2, 0.35]
   }
 }
 ```
@@ -441,6 +445,11 @@ discard, riichi, and call decisions. These fields are intended for fixed-seed
 before/after diagnostics; use larger samples before treating score changes as a
 strength conclusion.
 
+Add `--temperature 0.2` to benchmark the guarded style randomizer. Temperature does
+not change shanten priority, defense mode, riichi policy, or kan safety gates. It
+only samples near-equivalent discards, and the JSON reports how often an alternative
+was actually selected.
+
 ### 7. Settlement and statistics
 
 After each hand, the game displays every score change and whether the dealer continues or rotates. Interactive play waits for confirmation before the next hand. At match end it reports final ranking plus hands, wins, ron, tsumo, deal-ins, riichi, chi, pon, and kan for every player.
@@ -469,6 +478,7 @@ python main.py --mode game --language zh
 - `--ai-levels simple,advanced,advanced,simple`：按照“玩家、电脑1、电脑2、电脑3”的座位顺序设置电脑等级。交互模式下第一个座位仍由玩家控制。
 - `--auto-game`：四个座位全部交给电脑，用于测试和批量模拟。
 - `--language en|zh|ja`：选择英文、中文或日文牌局界面。
+- `--ai-temperature 0.2`：设置高级电脑的受约束风格随机性。`0` 完全固定，推荐使用 `0.2`；更高数值会增加变化和结果方差。
 
 也可以写入 JSON 配置：
 
@@ -479,7 +489,8 @@ python main.py --mode game --language zh
   "game": {
     "seed": 2026,
     "assist_mode": "hint",
-    "ai_levels": ["simple", "advanced", "advanced", "simple"]
+    "ai_levels": ["simple", "advanced", "advanced", "simple"],
+    "ai_temperature": [0.0, 0.2, 0.2, 0.35]
   }
 }
 ```
@@ -555,6 +566,8 @@ python benchmark_ai.py --games 24 --workers 4 --seed 800 \
 脚本会自动测试“1高级3初级”“2高级2初级”“3高级1初级”，并轮换电脑所在座位。报告包含和牌、荣和、自摸、放铳、立直、副露、平均点数、平均顺位、一位率、四位率、耗时和异常点数总和；可选 JSON 文件会保存每场、每位玩家的详细数据。
 
 质量统计还会记录：好型/愚型立直、立直后的和牌与放铳、立直和牌收入、副露带来的向听与有效进张变化、开手后的和牌与收入、面对立直威胁时的进攻/平衡/弃和次数及小局结果，以及弃牌、立直和副露决策耗时。这些数据适合使用相同种子做优化前后诊断；最终强度结论仍应使用更大样本。
+
+基准测试可增加 `--temperature 0.2` 测试受约束随机性。温度不会跨越向听优先级，不会改变押引模式、立直政策或杠牌安全门槛，只会在进张、危险度和牌价值足够接近的弃牌之间抽样；JSON 会记录实际采用不同弃牌的次数。
 
 ### 7. 小局结算与最终统计
 

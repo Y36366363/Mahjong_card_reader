@@ -33,9 +33,13 @@ def levels_for(matchup: str, game_index: int) -> list[str]:
     return levels
 
 
-def run_one(matchup: str, game_index: int, seed: int) -> dict[str, Any]:
+def run_one(matchup: str, game_index: int, seed: int, temperature: float = 0.0) -> dict[str, Any]:
     levels = levels_for(matchup, game_index)
-    game = MahjongGame(seed=seed, interactive=False, ai_levels=levels, language="en")
+    temperatures = [temperature if level == "advanced" else 0.0 for level in levels]
+    game = MahjongGame(
+        seed=seed, interactive=False, ai_levels=levels,
+        ai_temperatures=temperatures, language="en",
+    )
     started = time.perf_counter()
     with redirect_stdout(io.StringIO()):
         game.play()
@@ -46,6 +50,7 @@ def run_one(matchup: str, game_index: int, seed: int) -> dict[str, Any]:
         "matchup": matchup,
         "game_index": game_index,
         "seed": seed,
+        "temperature": temperature,
         "elapsed_seconds": elapsed,
         "point_total": sum(player.points for player in game.players),
         "players": [
@@ -98,6 +103,7 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
                         "push_wins", "push_deal_in", "fold_hands", "fold_wins",
                         "fold_deal_in", "discard_decisions", "discard_decision_seconds",
                         "riichi_decisions", "riichi_decision_seconds", "call_decision_seconds",
+                        "temperature_choices", "temperature_alternatives",
                     )
                 },
             }
@@ -130,6 +136,12 @@ def print_summary(summary: dict[str, Any]) -> None:
                     f"{quality['threatened_deal_in']}/{quality['threatened_survived']}; "
                     f"decision ms discard/riichi/call={discard_ms:.1f}/{riichi_ms:.1f}/{call_ms:.1f}"
                 )
+                if quality["temperature_choices"]:
+                    print(
+                        f"    temperature: eligible={quality['temperature_choices']}, "
+                        f"alternative={quality['temperature_alternatives']} "
+                        f"({quality['temperature_alternatives'] / quality['temperature_choices']:.1%})"
+                    )
 
 
 def main() -> None:
@@ -141,13 +153,17 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=800, help="First shared seed (default: 800)")
     parser.add_argument("--index-offset", type=int, default=0, help="Rotation index offset for batched runs")
     parser.add_argument("--workers", type=int, default=4, help="Parallel worker processes")
+    parser.add_argument(
+        "--temperature", type=float, default=0.0,
+        help="Advanced-AI constrained style temperature from 0 to 1 (default: 0)",
+    )
     parser.add_argument("--json", type=Path, default=None, help="Optional detailed JSON output path")
     args = parser.parse_args()
-    if args.games < 1 or args.workers < 1:
-        parser.error("--games and --workers must be positive.")
+    if args.games < 1 or args.workers < 1 or not 0 <= args.temperature <= 1:
+        parser.error("--games/workers must be positive and --temperature must be from 0 to 1.")
 
     tasks = [
-        (matchup, args.index_offset + index, args.seed + index)
+        (matchup, args.index_offset + index, args.seed + index, args.temperature)
         for matchup in MATCHUPS
         for index in range(args.games)
     ]

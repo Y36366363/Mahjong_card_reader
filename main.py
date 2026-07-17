@@ -205,6 +205,12 @@ def main() -> None:
         help="Game mode: four comma-separated AI levels (simple/advanced)",
     )
     ap.add_argument(
+        "--ai-temperature",
+        type=float,
+        default=None,
+        help="Game mode: constrained AI style randomness from 0 (fixed) to 1",
+    )
+    ap.add_argument(
         "--assist-mode",
         choices=["normal", "hint"],
         default=None,
@@ -239,6 +245,10 @@ def main() -> None:
         game_cfg = config.get("game", {})
         seed = args.seed if args.seed is not None else game_cfg.get("seed")
         levels_value = args.ai_levels if args.ai_levels is not None else game_cfg.get("ai_levels")
+        temperatures = (
+            args.ai_temperature if args.ai_temperature is not None
+            else game_cfg.get("ai_temperature", 0.0)
+        )
         assist_mode = args.assist_mode if args.assist_mode is not None else game_cfg.get("assist_mode")
         language = args.language if args.language is not None else game_cfg.get("language", config.get("language", "en"))
         levels = None
@@ -254,6 +264,7 @@ def main() -> None:
                 seed=seed,
                 interactive=not args.auto_game,
                 ai_levels=levels,
+                ai_temperatures=temperatures,
                 assist_mode=str(assist_mode).lower() if assist_mode else None,
                 language=str(language),
             ).play()

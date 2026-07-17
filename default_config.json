@@ -3,6 +3,9 @@
   "language": "zh",
   "hand": "1m 1m 1m 2m 3m 4m 0m 6m 7m 8m 9s 9s 9s",
   "river": "9p 9p 9p",
+  "game": {
+    "ai_temperature": 0.2
+  },
   "points": {
     "win_type": "ron",
     "win_tile": "9m",

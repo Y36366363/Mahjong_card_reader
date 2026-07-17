@@ -17,6 +17,33 @@ class AdvancedAITests(unittest.TestCase):
         self.assertEqual([p.ai_level for p in game.players], ["simple", "advanced", "simple", "advanced"])
         with self.assertRaises(ValueError):
             MahjongGame(ai_levels=["advanced"])
+        with self.assertRaises(ValueError):
+            MahjongGame(ai_temperatures=1.1)
+
+    def test_temperature_is_reproducible_and_never_crosses_shanten_guard(self) -> None:
+        game = MahjongGame(seed=77, ai_levels=["advanced"] * 4, ai_temperatures=0.8)
+        report = {
+            "mode": "push", "chosen": "1m",
+            "candidates": [
+                {"tile": "1m", "shanten": 1, "ukeire_total": 20, "ukeire_kinds": 6, "risk": 0.0, "tile_value": 0.0},
+                {"tile": "2m", "shanten": 1, "ukeire_total": 19, "ukeire_kinds": 6, "risk": 0.2, "tile_value": 0.2},
+                {"tile": "9p", "shanten": 2, "ukeire_total": 30, "ukeire_kinds": 8, "risk": 0.0, "tile_value": 0.0},
+            ],
+        }
+        choices = [game._temperature_discard_choice(0, report) for _ in range(100)]
+        self.assertTrue(set(choices) <= {"1m", "2m"})
+        self.assertIn("2m", choices)
+        replay = MahjongGame(seed=77, ai_levels=["advanced"] * 4, ai_temperatures=0.8)
+        self.assertEqual(
+            choices, [replay._temperature_discard_choice(0, report) for _ in range(100)]
+        )
+
+    def test_temperature_does_not_change_seeded_wall(self) -> None:
+        fixed = MahjongGame(seed=88, ai_temperatures=0.0)
+        varied = MahjongGame(seed=88, ai_temperatures=1.0)
+        fixed._new_wall(); varied._new_wall()
+        self.assertEqual(fixed.wall, varied.wall)
+        self.assertEqual(fixed.dead_wall, varied.dead_wall)
 
     def test_fast_draw_state_matches_full_ukeire_check(self) -> None:
         rng = random.Random(73)
