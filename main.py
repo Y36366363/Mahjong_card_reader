@@ -202,7 +202,7 @@ def main() -> None:
         "--ai-levels",
         type=str,
         default=None,
-        help="Game mode: four comma-separated AI levels (simple/advanced)",
+        help="Game mode: four AI profiles (basic_v1/advanced_v1; simple/advanced remain aliases)",
     )
     ap.add_argument(
         "--ai-temperature",

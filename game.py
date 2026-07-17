@@ -14,6 +14,44 @@ from tiles import index_to_tile, tile_to_index, tiles_to_counts
 WINDS = ("E", "S", "W", "N")
 
 
+@dataclass(frozen=True)
+class AIProfile:
+    """Stable public AI identity separated from its internal policy key."""
+
+    profile_id: str
+    display_name: str
+    policy: str
+    default_temperature: float
+    description: str
+
+
+AI_PROFILES = {
+    "basic_v1": AIProfile(
+        "basic_v1", "Basic AI v1", "simple", 0.0,
+        "Fast baseline AI that prioritizes standard-hand shanten.",
+    ),
+    "advanced_v1": AIProfile(
+        "advanced_v1", "Advanced AI v1", "advanced", 0.2,
+        "Explainable heuristic AI with efficiency, defense, placement, calls, riichi, and style temperature.",
+    ),
+}
+
+AI_PROFILE_ALIASES = {
+    "simple": "basic_v1", "basic": "basic_v1", "basic_v1": "basic_v1",
+    "basic ai v1": "basic_v1",
+    "advanced": "advanced_v1", "advanced_v1": "advanced_v1",
+    "advanced ai v1": "advanced_v1",
+}
+
+
+def resolve_ai_profile(value: str) -> AIProfile:
+    profile_id = AI_PROFILE_ALIASES.get(value.strip().lower())
+    if profile_id is None:
+        supported = ", ".join(AI_PROFILES)
+        raise ValueError(f"Unknown AI profile {value!r}; use one of: {supported}.")
+    return AI_PROFILES[profile_id]
+
+
 def tile_sort_key(tile: str) -> tuple[int, int]:
     i = tile_to_index(tile)
     return (i, 0)
@@ -83,6 +121,7 @@ class PlayerStats:
 class PlayerState:
     name: str
     ai_level: str = "simple"
+    ai_profile: str = "basic_v1"
     ai_temperature: float = 0.0
     points: int = 25_000
     hand: list[str] = field(default_factory=list)
@@ -133,9 +172,10 @@ class MahjongGame:
         if assist_mode not in {None, "normal", "hint"}:
             raise ValueError("assist_mode must be normal or hint.")
         self.assist_mode = assist_mode
-        levels = ai_levels or ["simple"] * 4
-        if len(levels) != 4 or any(level not in {"simple", "advanced"} for level in levels):
-            raise ValueError("ai_levels must contain four values: simple or advanced.")
+        levels = ai_levels or ["basic_v1"] * 4
+        if len(levels) != 4:
+            raise ValueError("ai_levels must contain four AI profiles.")
+        profiles = [resolve_ai_profile(str(level)) for level in levels]
         if ai_temperatures is None:
             temperatures = [0.0] * 4
         elif isinstance(ai_temperatures, (int, float)):
@@ -145,9 +185,12 @@ class MahjongGame:
         if len(temperatures) != 4 or any(not 0.0 <= value <= 1.0 for value in temperatures):
             raise ValueError("ai_temperatures must be a number or four values from 0 to 1.")
         self.players = [
-            PlayerState(name, ai_level=level, ai_temperature=temperature)
-            for name, level, temperature in zip(
-                ("You", "AI-1", "AI-2", "AI-3"), levels, temperatures
+            PlayerState(
+                name, ai_level=profile.policy, ai_profile=profile.profile_id,
+                ai_temperature=temperature,
+            )
+            for name, profile, temperature in zip(
+                ("You", "AI-1", "AI-2", "AI-3"), profiles, temperatures
             )
         ]
         decision_seed = seed if seed is not None else random.SystemRandom().getrandbits(64)
@@ -272,10 +315,8 @@ class MahjongGame:
         elif self.assist_mode is None:
             self.assist_mode = "normal"
         levels = ", ".join(
-            f"{self._name(p)}=" + (
-                (("高级" if p.ai_level == "advanced" else "简单") if self.language == "zh" else
-                 ("上級" if p.ai_level == "advanced" else "初級") if self.language == "ja" else p.ai_level)
-            ) + (f"(T={p.ai_temperature:g})" if p.ai_level == "advanced" else "")
+            f"{self._name(p)}={AI_PROFILES[p.ai_profile].display_name}"
+            + (f"(T={p.ai_temperature:g})" if p.ai_level == "advanced" else "")
             for p in self.players
         )
         if self.language == "zh":

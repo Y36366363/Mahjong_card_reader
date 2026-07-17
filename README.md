@@ -2,6 +2,8 @@
 
 ## Updates 7/17/2026
 
+- Frozen the current computer policies as stable, reusable profiles: **Basic AI v1** and **Advanced AI v1**. Legacy `simple`/`advanced` names remain supported aliases.
+- Added profile metadata for future UI selectors, including stable ID, display name, internal policy, recommended temperature, and description.
 - Added advanced-AI quality telemetry for riichi wait quality/results/value, call shanten and ukeire gains, threatened-hand push/fold outcomes, and discard/riichi/call decision time.
 - Extended benchmark JSON and console summaries with the new explainable quality metrics.
 - Tightened value-honor calls that keep the same shanten: opening now requires a meaningful effective-tile gain instead of merely avoiding a large loss.
@@ -141,7 +143,7 @@ Set the display language at the root of `default_config.json`:
   "language": "zh",
   "game": {
     "assist_mode": "hint",
-    "ai_levels": ["simple", "advanced", "advanced", "simple"]
+    "ai_levels": ["basic_v1", "advanced_v1", "advanced_v1", "basic_v1"]
   }
 }
 ```
@@ -162,7 +164,7 @@ Choose the four computer levels in seat order (`You,AI-1,AI-2,AI-3`):
 
 ```bash
 python main.py --mode game --auto-game --seed 2026 \
-  --ai-levels advanced,simple,advanced,simple
+  --ai-levels advanced_v1,basic_v1,advanced_v1,basic_v1
 ```
 
 Run the deterministic AI regression tests with:
@@ -334,7 +336,7 @@ Useful options:
 - `--seed 2026`: fixes every shuffled wall for reproducible play.
 - `--assist-mode normal`: shows the table without strategic recommendations.
 - `--assist-mode hint`: enables shanten, discard, effective-tile, and tile-tracker hints.
-- `--ai-levels simple,advanced,advanced,simple`: selects one computer level for each seat in `You,AI-1,AI-2,AI-3` order. In an interactive game, the first seat remains user-controlled.
+- `--ai-levels basic_v1,advanced_v1,advanced_v1,basic_v1`: selects one versioned computer profile for each seat in `You,AI-1,AI-2,AI-3` order. In an interactive game, the first seat remains user-controlled. The old `simple/advanced` names remain compatible aliases.
 - `--ai-temperature 0.2`: controls constrained advanced-AI style variation. `0` is fully deterministic; `0.2` is recommended; high values create more variety and variance.
 - `--auto-game`: lets the computer control all four seats for testing or simulation.
 - `--language en|zh|ja`: selects English, Chinese, or Japanese game UI.
@@ -348,7 +350,7 @@ The same settings can be stored in JSON:
   "game": {
     "seed": 2026,
     "assist_mode": "hint",
-    "ai_levels": ["simple", "advanced", "advanced", "simple"],
+    "ai_levels": ["basic_v1", "advanced_v1", "advanced_v1", "basic_v1"],
     "ai_temperature": [0.0, 0.2, 0.2, 0.35]
   }
 }
@@ -395,10 +397,10 @@ Hint mode uses the advanced heuristic AI to show:
 
 The tracker only uses information visible to the player: your hand, every river, public melds, and dora indicators. It does not reveal opponents' concealed tiles or the actual future wall.
 
-### 6. Computer levels
+### 6. Computer profiles
 
-- **Simple computer:** minimizes standard-hand shanten, normally remains closed for riichi, and opens mainly for value honors.
-- **Advanced computer:** additionally evaluates effective-tile breadth/count, dora and value-honor retention, genbutsu, suji, walls, honor safety, current rank, folding, call value, and kan risk.
+- **Basic AI v1 (`basic_v1`):** frozen baseline policy that minimizes standard-hand shanten, normally remains closed for riichi, and opens mainly for value honors.
+- **Advanced AI v1 (`advanced_v1`):** frozen explainable policy that additionally evaluates effective-tile breadth/count, dora and value-honor retention, genbutsu, suji, walls, honor safety, current rank, folding, call value, kan risk, riichi quality, and constrained style temperature.
 
 These computers are deterministic heuristic agents; they do not require reinforcement-learning training.
 
@@ -475,7 +477,7 @@ python main.py --mode game --language zh
 - `--seed 2026`：固定每一局洗好的牌山，方便复现相同对局。
 - `--assist-mode normal`：普通模式，只显示牌桌信息。
 - `--assist-mode hint`：提示模式，提供向听、推荐弃牌、有效牌和记牌器。
-- `--ai-levels simple,advanced,advanced,simple`：按照“玩家、电脑1、电脑2、电脑3”的座位顺序设置电脑等级。交互模式下第一个座位仍由玩家控制。
+- `--ai-levels basic_v1,advanced_v1,advanced_v1,basic_v1`：按照“玩家、电脑1、电脑2、电脑3”的座位顺序设置版本化电脑。交互模式下第一个座位仍由玩家控制；旧名称 `simple/advanced` 仍可兼容使用。
 - `--auto-game`：四个座位全部交给电脑，用于测试和批量模拟。
 - `--language en|zh|ja`：选择英文、中文或日文牌局界面。
 - `--ai-temperature 0.2`：设置高级电脑的受约束风格随机性。`0` 完全固定，推荐使用 `0.2`；更高数值会增加变化和结果方差。
@@ -489,7 +491,7 @@ python main.py --mode game --language zh
   "game": {
     "seed": 2026,
     "assist_mode": "hint",
-    "ai_levels": ["simple", "advanced", "advanced", "simple"],
+    "ai_levels": ["basic_v1", "advanced_v1", "advanced_v1", "basic_v1"],
     "ai_temperature": [0.0, 0.2, 0.2, 0.35]
   }
 }
@@ -537,10 +539,10 @@ python main.py --mode game --language zh
 
 记牌器只使用玩家能够看到的信息：自己的手牌、四家牌河、公开副露和宝牌指示牌。它不会读取其他家的暗手牌，也不会泄露真实后续牌山。
 
-### 6. 电脑等级
+### 6. 电脑版本
 
-- **简单电脑**：主要选择最低标准手向听数的弃牌，通常保持门清立直，只对役牌进行较简单的副露。
-- **高级电脑**：进一步考虑有效进张、剩余牌数、宝牌与役牌保留、现物、筋、壁、字牌安全度、当前排名、弃和判断、副露收益和杠牌风险。
+- **Basic AI v1（`basic_v1`）**：冻结保留的基础策略，主要选择最低标准手向听数的弃牌，通常保持门清立直，只对役牌进行较简单的副露。
+- **Advanced AI v1（`advanced_v1`）**：冻结保留的可解释高级策略，进一步考虑有效进张、剩余牌数、宝牌与役牌保留、防守、顺位押引、副露、杠牌、立直质量和受约束温度。
 
 两种电脑均为确定性的启发式程序，不需要进行大量强化学习训练。
 

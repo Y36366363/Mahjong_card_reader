@@ -15,8 +15,19 @@ class AdvancedAITests(unittest.TestCase):
     def test_ai_levels_are_explicit_and_validated(self) -> None:
         game = MahjongGame(ai_levels=["simple", "advanced", "simple", "advanced"])
         self.assertEqual([p.ai_level for p in game.players], ["simple", "advanced", "simple", "advanced"])
+        self.assertEqual(
+            [p.ai_profile for p in game.players],
+            ["basic_v1", "advanced_v1", "basic_v1", "advanced_v1"],
+        )
+        versioned = MahjongGame(ai_levels=["basic_v1", "advanced_v1"] * 2)
+        self.assertEqual(
+            [p.ai_level for p in versioned.players],
+            ["simple", "advanced", "simple", "advanced"],
+        )
         with self.assertRaises(ValueError):
             MahjongGame(ai_levels=["advanced"])
+        with self.assertRaises(ValueError):
+            MahjongGame(ai_levels=["unknown"] * 4)
         with self.assertRaises(ValueError):
             MahjongGame(ai_temperatures=1.1)
 
