@@ -2,6 +2,7 @@
 
 ## Updates 7/17/2026
 
+- Removed committed Python bytecode caches and added `.gitignore` rules so future `__pycache__`, `.pyc`, test/tool caches, local virtual environments, and macOS metadata stay out of version control automatically.
 - Corrected desktop table orientation: the human seat is fixed at the bottom, the opposite seat at the top, seat 3 on the left, and seat 1 on the right. Added a regression test for this perspective mapping and verified a live GUI discard updates the human river.
 - Added the first playable desktop UI in `desktop_ui.py`, built with dependency-free Tkinter. It provides a setup screen, versioned AI selection, temperature/seed/assist settings, a four-seat table, live rivers/melds/scores, clickable hand tiles, action buttons, and a game log.
 - Added a threaded compatibility adapter that turns the proven interactive engine prompts into GUI actions without duplicating Mahjong rules. This is an initial bridge toward a fully event-driven engine/UI split.

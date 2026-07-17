@@ -1,0 +1,19 @@
+# Python bytecode caches (always safe to regenerate)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Common test/tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# macOS metadata
+.DS_Store
