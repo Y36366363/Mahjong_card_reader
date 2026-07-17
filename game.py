@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import re
+import time
 from dataclasses import dataclass, field
 
 from remaining import RemainingTileCounter
@@ -45,6 +46,35 @@ class PlayerStats:
     chi: int = 0
     pon: int = 0
     kan: int = 0
+    riichi_good_wait: int = 0
+    riichi_bad_wait: int = 0
+    riichi_wins: int = 0
+    riichi_deal_in: int = 0
+    riichi_win_points: int = 0
+    call_decisions: int = 0
+    call_opportunities: int = 0
+    call_shanten_gain: int = 0
+    call_ukeire_delta: int = 0
+    open_hand_wins: int = 0
+    open_hand_win_points: int = 0
+    defense_push: int = 0
+    defense_balanced: int = 0
+    defense_fold: int = 0
+    threatened_hands: int = 0
+    threatened_wins: int = 0
+    threatened_deal_in: int = 0
+    threatened_survived: int = 0
+    push_hands: int = 0
+    push_wins: int = 0
+    push_deal_in: int = 0
+    fold_hands: int = 0
+    fold_wins: int = 0
+    fold_deal_in: int = 0
+    discard_decisions: int = 0
+    discard_decision_seconds: float = 0.0
+    riichi_decisions: int = 0
+    riichi_decision_seconds: float = 0.0
+    call_decision_seconds: float = 0.0
 
 
 @dataclass
@@ -114,6 +144,8 @@ class MahjongGame:
         self.dead_wall: list[str] = []
         self.dora_indicators: list[str] = []
         self._call_win_dealer_continues: bool | None = None
+        self._hand_threat_modes: list[set[str]] = [set() for _ in range(4)]
+        self._hand_outcomes: list[str | None] = [None] * 4
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -296,6 +328,7 @@ class MahjongGame:
         for p in self.players:
             p.stats.hands += 1
         dealer_continues = self._play_hand_core()
+        self._finalize_ai_hand_metrics()
         self._show_hand_settlement(before, dealer_continues)
         match_ends = any(p.points <= 0 for p in self.players) or (
             self.round_hand == 3 and not dealer_continues
@@ -307,6 +340,8 @@ class MahjongGame:
     def _play_hand_core(self) -> bool:
         self._new_wall()
         self._call_win_dealer_continues = None
+        self._hand_threat_modes = [set() for _ in range(4)]
+        self._hand_outcomes = [None] * 4
         for p in self.players:
             p.hand.clear(); p.melds.clear(); p.river.clear(); p.riichi = False
             p.temporary_furiten = False; p.riichi_furiten = False
@@ -519,15 +554,27 @@ class MahjongGame:
         # its later discard behaviour deterministic.
         p.hand.remove(discard)
         can_riichi = best_shanten == 0 and p.is_closed and not p.riichi and p.points >= 1000
+        profile: dict[str, object] | None = None
         if can_riichi and seat == 0 and self.interactive:
             declare = self._yes_no(self._t(
                 "Declare riichi?", "是否立直？", "リーチしますか？"
             ), False)
         else:
-            declare = can_riichi and self._should_declare_riichi(seat)
+            if can_riichi and p.ai_level == "advanced":
+                started = time.perf_counter()
+                profile = self._tenpai_profile(seat)
+                declare = self._should_declare_riichi(seat, profile=profile)
+                p.stats.riichi_decisions += 1
+                p.stats.riichi_decision_seconds += time.perf_counter() - started
+            else:
+                declare = can_riichi and self._should_declare_riichi(seat)
         if declare:
             p.riichi = True; p.points -= 1000; self.riichi_sticks += 1
             p.stats.riichi += 1
+            if profile and profile["good_wait"]:
+                p.stats.riichi_good_wait += 1
+            elif profile:
+                p.stats.riichi_bad_wait += 1
             print(self._t(f"{self._name(p)} declares riichi.", f"{self._name(p)}宣布立直。"))
         p.hand.append(discard); p.sort()
         return discard
@@ -559,8 +606,11 @@ class MahjongGame:
                 visible.extend(meld.tiles)
         return tiles_to_counts(visible)
 
-    def _ukeire(self, p: PlayerState, visible: list[int]) -> tuple[int, int]:
-        current = self._standard_shanten(p)
+    def _ukeire(
+        self, p: PlayerState, visible: list[int], *, current: int | None = None
+    ) -> tuple[int, int]:
+        if current is None:
+            current = self._standard_shanten(p)
         base_counts = tiles_to_counts(self._full_for_analysis(p))
         kinds = total = 0
         for i in range(34):
@@ -573,10 +623,15 @@ class MahjongGame:
                 kinds += 1; total += left
         return kinds, total
 
-    def _tile_value(self, seat: int, tile: str) -> float:
+    def _tile_value(
+        self, seat: int, tile: str, *, hand_counts: list[int] | None = None,
+        dora_tiles: set[str] | None = None,
+    ) -> float:
         p = self.players[seat]
         value = 0.0
-        if tile in {dora_from_indicator(x) for x in self.dora_indicators}:
+        if dora_tiles is None:
+            dora_tiles = {dora_from_indicator(x) for x in self.dora_indicators}
+        if tile in dora_tiles:
             value += 6.0
         seat_wind = WINDS[(seat - self.dealer) % 4]
         if tile in {"P", "F", "C", "E", seat_wind}:
@@ -584,7 +639,7 @@ class MahjongGame:
         i = tile_to_index(tile)
         if i < 27:
             pos = i % 9
-            counts = tiles_to_counts(p.hand)
+            counts = hand_counts if hand_counts is not None else tiles_to_counts(p.hand)
             for delta in (-2, -1, 1, 2):
                 j = i + delta
                 if 0 <= j < 27 and j // 9 == i // 9 and counts[j]:
@@ -793,11 +848,11 @@ class MahjongGame:
         )
         return 2000 + dora_count * 1000 + yakuhai * 1000
 
-    def _should_declare_riichi(self, seat: int) -> bool:
+    def _should_declare_riichi(self, seat: int, *, profile: dict[str, object] | None = None) -> bool:
         player = self.players[seat]
         if not player.is_closed or player.points < 1000 or self._standard_shanten(player) != 0:
             return False
-        profile = self._tenpai_profile(seat)
+        profile = profile or self._tenpai_profile(seat)
         if not profile["waits"]:
             return False
         rank = self._current_rank(seat)
@@ -837,6 +892,8 @@ class MahjongGame:
         """Return an explainable advanced-AI discard decision."""
         player = self.players[seat]
         visible = self._visible_counts(seat)
+        hand_counts = tiles_to_counts(player.hand)
+        dora_tiles = {dora_from_indicator(x) for x in self.dora_indicators}
         threats = [i for i, other in enumerate(self.players) if i != seat and other.riichi]
         shanten_by_tile = {
             tile: self._shanten_after_discard(player, tile)
@@ -848,7 +905,7 @@ class MahjongGame:
             kinds = total = 0
             if shanten == best_shanten:
                 player.hand.remove(tile)
-                kinds, total = self._ukeire(player, visible)
+                kinds, total = self._ukeire(player, visible, current=shanten)
                 # Full scoring is comparatively expensive. Wait/value details only
                 # affect discard selection while deciding whether to push against
                 # an active riichi; the selected hand is evaluated again by the
@@ -861,7 +918,10 @@ class MahjongGame:
             candidates.append({
                 "tile": tile, "shanten": shanten, "ukeire_kinds": kinds,
                 "ukeire_total": total, "risk": defense["total"],
-                "risk_tags": defense["tags"], "tile_value": self._tile_value(seat, tile),
+                "risk_tags": defense["tags"],
+                "tile_value": self._tile_value(
+                    seat, tile, hand_counts=hand_counts, dora_tiles=dora_tiles
+                ),
                 "estimated_points": int(profile["expected_points"]) if profile else self._rough_hand_value(seat),
                 "good_wait": bool(profile["good_wait"]) if profile else False,
             })
@@ -898,7 +958,16 @@ class MahjongGame:
         return {"mode": mode, "threats": threats, "chosen": chosen["tile"], "candidates": candidates}
 
     def _choose_advanced_discard(self, seat: int) -> str:
-        return str(self.advanced_discard_report(seat)["chosen"])
+        started = time.perf_counter()
+        report = self.advanced_discard_report(seat)
+        stats = self.players[seat].stats
+        stats.discard_decisions += 1
+        stats.discard_decision_seconds += time.perf_counter() - started
+        if report["threats"]:
+            mode = str(report["mode"])
+            setattr(stats, f"defense_{mode}", getattr(stats, f"defense_{mode}") + 1)
+            self._hand_threat_modes[seat].add(mode)
+        return str(report["chosen"])
 
     def _call_options(self, caller: int, discarder: int, tile: str) -> list[tuple[str, list[str]]]:
         p = self.players[caller]
@@ -931,10 +1000,14 @@ class MahjongGame:
             chosen: tuple[str, list[str]] | None = None
             if caller == 0 and opts and self.interactive:
                 chosen = self._choose_user_call(tile, opts)
-            elif caller != 0 or not self.interactive:
+            elif opts and (caller != 0 or not self.interactive):
                 seat_wind = WINDS[(caller - self.dealer) % 4]
                 if self.players[caller].ai_level == "advanced":
+                    started = time.perf_counter()
                     chosen = self._advanced_call_choice(caller, tile, opts)
+                    if opts:
+                        self.players[caller].stats.call_opportunities += 1
+                    self.players[caller].stats.call_decision_seconds += time.perf_counter() - started
                 elif tile in {"P", "F", "C", "E", seat_wind}:
                     chosen = next((o for o in reversed(opts) if o[0] in {"pon", "kan"}), None)
             if chosen:
@@ -1042,7 +1115,9 @@ class MahjongGame:
         # A closed hand that is already tenpai should preserve its riichi route.
         if p.is_closed and before_shanten <= 0:
             return None
-        choices: list[tuple[tuple[int, int, int], tuple[str, list[str]]]] = []
+        choices: list[
+            tuple[tuple[int, int, int], tuple[str, list[str]], int, int]
+        ] = []
         for option in opts:
             kind, meld_tiles = option
             # Opening without a known yaku is deliberately avoided. This keeps
@@ -1064,12 +1139,50 @@ class MahjongGame:
             # remaining improvement count not to collapse too severely.
             if after_shanten > before_shanten:
                 continue
+            # Opening a hand without becoming faster needs a real ukeire gain;
+            # otherwise it gives up riichi and defensive flexibility for almost
+            # no speed benefit.
+            if after_shanten == before_shanten and after_ukeire < before_ukeire + 4:
+                continue
             if before_shanten <= 1 and after_ukeire * 2 < before_ukeire:
                 continue
             if kind == "kan" and after_shanten >= before_shanten and after_ukeire < before_ukeire:
                 continue
-            choices.append(((after_shanten, -after_ukeire, 1 if kind == "kan" else 0), option))
-        return min(choices, default=((), None))[1]
+            choices.append((
+                (after_shanten, -after_ukeire, 1 if kind == "kan" else 0),
+                option, after_shanten, after_ukeire,
+            ))
+        selected = min(choices, default=None)
+        chosen = selected[1] if selected else None
+        if selected is not None:
+            after_shanten, after_ukeire = selected[2], selected[3]
+            p.stats.call_decisions += 1
+            p.stats.call_shanten_gain += before_shanten - after_shanten
+            p.stats.call_ukeire_delta += after_ukeire - before_ukeire
+        return chosen
+
+    def _finalize_ai_hand_metrics(self) -> None:
+        """Convert per-decision threat traces into one outcome per threatened hand."""
+        for seat, modes in enumerate(self._hand_threat_modes):
+            if not modes:
+                continue
+            stats = self.players[seat].stats
+            stats.threatened_hands += 1
+            outcome = self._hand_outcomes[seat]
+            if outcome == "win":
+                stats.threatened_wins += 1
+            elif outcome == "deal_in":
+                stats.threatened_deal_in += 1
+            else:
+                stats.threatened_survived += 1
+            for mode, prefix in (("push", "push"), ("fold", "fold")):
+                if mode not in modes:
+                    continue
+                setattr(stats, f"{prefix}_hands", getattr(stats, f"{prefix}_hands") + 1)
+                if outcome == "win":
+                    setattr(stats, f"{prefix}_wins", getattr(stats, f"{prefix}_wins") + 1)
+                elif outcome == "deal_in":
+                    setattr(stats, f"{prefix}_deal_in", getattr(stats, f"{prefix}_deal_in") + 1)
 
     def _show_state(self, draw: str, *, event_label: str | None = None) -> None:
         p = self.players[0]
@@ -1243,6 +1356,16 @@ class MahjongGame:
             self.players[winner].stats.wins += 1
             self.players[winner].stats.ron += 1
             self.players[loser].stats.deal_in += 1
+            self._hand_outcomes[winner] = "win"
+            self._hand_outcomes[loser] = "deal_in"
+            if self.players[winner].riichi:
+                self.players[winner].stats.riichi_wins += 1
+                self.players[winner].stats.riichi_win_points += amount
+            if self.players[loser].riichi:
+                self.players[loser].stats.riichi_deal_in += 1
+            if self.players[winner].melds:
+                self.players[winner].stats.open_hand_wins += 1
+                self.players[winner].stats.open_hand_win_points += amount
             print(self._t(
                 f"{self._name(self.players[winner])} ron: {self._score_label(sb)} from {self._name(self.players[loser])}.",
                 f"{self._name(self.players[winner])}荣和：{self._score_label(sb)}，放铳者为{self._name(self.players[loser])}。",
@@ -1266,6 +1389,14 @@ class MahjongGame:
         self.players[winner].points += self.riichi_sticks * 1000; self.riichi_sticks = 0
         self.players[winner].stats.wins += 1
         self.players[winner].stats.tsumo += 1
+        self._hand_outcomes[winner] = "win"
+        win_amount = int(p.tsumo_total_points) + self.honba * 300
+        if self.players[winner].riichi:
+            self.players[winner].stats.riichi_wins += 1
+            self.players[winner].stats.riichi_win_points += win_amount
+        if self.players[winner].melds:
+            self.players[winner].stats.open_hand_wins += 1
+            self.players[winner].stats.open_hand_win_points += win_amount
         print(self._t(
             f"{self._name(self.players[winner])} tsumo: {self._score_label(sb)}.",
             f"{self._name(self.players[winner])}自摸：{self._score_label(sb)}。",

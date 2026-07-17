@@ -40,6 +40,10 @@ class BenchmarkAITests(unittest.TestCase):
         result = summarize(games)
         self.assertEqual(result["1_advanced"]["invalid_point_totals"], 1)
         self.assertEqual(result["2_advanced"]["invalid_point_totals"], 0)
+        self.assertIn("quality", result["1_advanced"]["advanced"])
+        self.assertEqual(
+            result["1_advanced"]["advanced"]["quality"]["riichi_wins"], 0
+        )
 
 
 if __name__ == "__main__":

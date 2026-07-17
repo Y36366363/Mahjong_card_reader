@@ -86,6 +86,20 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
                 "average_rank": sum(row["rank"] for row in rows) / entries,
                 "first_rate": sum(row["rank"] == 1 for row in rows) / entries,
                 "fourth_rate": sum(row["rank"] == 4 for row in rows) / entries,
+                "quality": {
+                    key: sum(row.get(key, 0) for row in rows)
+                    for key in (
+                        "riichi_good_wait", "riichi_bad_wait", "riichi_wins",
+                        "riichi_deal_in", "riichi_win_points", "call_decisions", "call_opportunities",
+                        "call_shanten_gain", "call_ukeire_delta", "open_hand_wins",
+                        "open_hand_win_points", "defense_push", "defense_balanced",
+                        "defense_fold", "threatened_hands", "threatened_wins",
+                        "threatened_deal_in", "threatened_survived", "push_hands",
+                        "push_wins", "push_deal_in", "fold_hands", "fold_wins",
+                        "fold_deal_in", "discard_decisions", "discard_decision_seconds",
+                        "riichi_decisions", "riichi_decision_seconds", "call_decision_seconds",
+                    )
+                },
             }
         summary[matchup] = block
     return summary
@@ -104,6 +118,18 @@ def print_summary(summary: dict[str, Any]) -> None:
                 f"{row['average_points']:>10.0f} {row['average_rank']:>8.2f} "
                 f"{row['first_rate']:>6.1%} {row['fourth_rate']:>7.1%}"
             )
+            quality = row["quality"]
+            if quality["discard_decisions"]:
+                discard_ms = 1000 * quality["discard_decision_seconds"] / quality["discard_decisions"]
+                riichi_ms = 1000 * quality["riichi_decision_seconds"] / max(1, quality["riichi_decisions"])
+                call_ms = 1000 * quality["call_decision_seconds"] / max(1, quality["call_opportunities"])
+                print(
+                    f"    quality: riichi good/bad={quality['riichi_good_wait']}/{quality['riichi_bad_wait']}, "
+                    f"wins/deal-in={quality['riichi_wins']}/{quality['riichi_deal_in']}; "
+                    f"threat hands win/deal-in/survive={quality['threatened_wins']}/"
+                    f"{quality['threatened_deal_in']}/{quality['threatened_survived']}; "
+                    f"decision ms discard/riichi/call={discard_ms:.1f}/{riichi_ms:.1f}/{call_ms:.1f}"
+                )
 
 
 def main() -> None:

@@ -258,6 +258,9 @@ class CallAndKanTests(unittest.TestCase):
         with patch.object(game, "_standard_shanten", side_effect=[1, 1]), \
              patch.object(game, "_ukeire", side_effect=[(5, 10), (2, 4)]):
             self.assertIsNone(game._advanced_call_choice(0, "E", option))
+        with patch.object(game, "_standard_shanten", side_effect=[2, 2]), \
+             patch.object(game, "_ukeire", side_effect=[(5, 12), (5, 15)]):
+            self.assertIsNone(game._advanced_call_choice(0, "E", option))
 
     def test_kan_is_rejected_for_riichi_threat_lead_and_short_wall(self) -> None:
         option = [("kan", ["E"] * 4)]
