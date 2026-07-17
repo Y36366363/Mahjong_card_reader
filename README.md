@@ -2,6 +2,8 @@
 
 ## Updates 7/17/2026
 
+- Added the first playable desktop UI in `desktop_ui.py`, built with dependency-free Tkinter. It provides a setup screen, versioned AI selection, temperature/seed/assist settings, a four-seat table, live rivers/melds/scores, clickable hand tiles, action buttons, and a game log.
+- Added a threaded compatibility adapter that turns the proven interactive engine prompts into GUI actions without duplicating Mahjong rules. This is an initial bridge toward a fully event-driven engine/UI split.
 - Frozen the current computer policies as stable, reusable profiles: **Basic AI v1** and **Advanced AI v1**. Legacy `simple`/`advanced` names remain supported aliases.
 - Added profile metadata for future UI selectors, including stable ID, display name, internal policy, recommended temperature, and description.
 - Added advanced-AI quality telemetry for riichi wait quality/results/value, call shanten and ukeire gains, threatened-hand push/fold outcomes, and discard/riichi/call decision time.
@@ -325,6 +327,20 @@ Red fives are accepted as `0m 0p 0s` and are treated as normal 5s for shanten/co
 
 ### 1. Starting a game
 
+Launch the playable desktop preview (no third-party packages required):
+
+```bash
+python desktop_ui.py
+```
+
+The setup screen selects language, Basic AI v1 or Advanced AI v1 opponents,
+temperature, normal/hint mode, and an optional replay seed. During play, click a
+tile to discard and use the action panel for ron/tsumo, riichi, chi/pon/kan, passing,
+and proceeding after settlement. The right-side log retains full scoring and hint
+details. This first desktop version is a compatibility UI; a later phase can replace
+the prompt bridge with a native event/action API and add packaged app launchers,
+tile artwork, animation, sound, and save/resume.
+
 Run an interactive East-round match:
 
 ```bash
@@ -465,6 +481,14 @@ The simulator includes fixed walls after the initial shuffle, ron/tsumo settleme
 ## 麻将对局指引与功能介绍（中文）
 
 ### 1. 开始游戏
+
+启动可游玩的桌面预览版（不需要安装第三方 UI 包）：
+
+```bash
+python desktop_ui.py
+```
+
+设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式和可选复现种子。牌局中直接点击手牌弃牌，通过右侧操作区选择荣和/自摸、立直、吃碰杠、跳过和结算后继续；右侧牌局记录会保留完整计分与提示信息。当前桌面版属于第一阶段兼容 UI，后续可以把输入桥接替换成正式事件接口，并加入应用打包、牌面美术、动画、音效和存档继续功能。
 
 启动主视角东风战：
 
