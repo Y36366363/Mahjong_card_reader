@@ -1,5 +1,9 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/18/2026
+
+- Removed previously tracked Python bytecode caches from the repository. Existing `.gitignore` rules now keep regenerated `__pycache__`, `.pyc`, test/tool caches, virtual environments, and macOS metadata out of future commits.
+
 ## Updates 7/17/2026
 
 - Removed committed Python bytecode caches and added `.gitignore` rules so future `__pycache__`, `.pyc`, test/tool caches, local virtual environments, and macOS metadata stay out of version control automatically.
