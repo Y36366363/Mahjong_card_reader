@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import queue
 import unittest
+from unittest.mock import patch
 
-from desktop_ui import TABLE_POSITIONS, QueueWriter, classify_prompt
+from desktop_ui import (
+    PROFILE_DISPLAY_TO_ID,
+    TABLE_POSITIONS,
+    QueueWriter,
+    classify_prompt,
+    resolve_desktop_seed,
+)
 
 
 class DesktopUIAdapterTests(unittest.TestCase):
@@ -25,6 +32,13 @@ class DesktopUIAdapterTests(unittest.TestCase):
         writer = QueueWriter(events)
         self.assertEqual(writer.write("East 1\n"), 7)
         self.assertEqual(events.get_nowait(), ("output", "East 1\n"))
+
+    def test_ai_profile_labels_and_replay_seeds_are_ui_ready(self) -> None:
+        self.assertEqual(PROFILE_DISPLAY_TO_ID["Basic AI v1"], "basic_v1")
+        self.assertEqual(PROFILE_DISPLAY_TO_ID["Advanced AI v1"], "advanced_v1")
+        self.assertEqual(resolve_desktop_seed(" 20260718 "), 20260718)
+        with patch("desktop_ui.secrets.randbits", return_value=987654321):
+            self.assertEqual(resolve_desktop_seed(""), 987654321)
 
 
 if __name__ == "__main__":

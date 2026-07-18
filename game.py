@@ -205,6 +205,9 @@ class MahjongGame:
         self._call_win_dealer_continues: bool | None = None
         self._hand_threat_modes: list[set[str]] = [set() for _ in range(4)]
         self._hand_outcomes: list[str | None] = [None] * 4
+        self.last_hint_report: dict[str, object] | None = None
+        self.last_hint_recommendation: str | None = None
+        self.last_chi_options: list[list[str]] = []
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -1188,6 +1191,7 @@ class MahjongGame:
             return by_kind["pon"][0]
         chi = by_kind["chi"]
         if chi:
+            self.last_chi_options = [sequence.copy() for _, sequence in chi]
             print(self._t(f"Chi opportunity on {tile}:", f"可以吃 {tile}："))
             print(self._t("  0. Pass", "  0. 跳过"))
             for i, (_, sequence) in enumerate(chi, 1):
@@ -1195,9 +1199,12 @@ class MahjongGame:
             while True:
                 raw = input(self._t("Choose chi: ", "请选择吃法：")).strip()
                 if raw in {"", "0"}:
+                    self.last_chi_options = []
                     return None
                 if raw.isdigit() and 1 <= int(raw) <= len(chi):
-                    return chi[int(raw) - 1]
+                    chosen = chi[int(raw) - 1]
+                    self.last_chi_options = []
+                    return chosen
                 print(self._t("Invalid choice.", "选择无效。"))
         return None
 
@@ -1341,6 +1348,8 @@ class MahjongGame:
             shanten = self._standard_shanten(p)
             report = None if p.riichi else self.advanced_discard_report(0)
             recommendation = draw if p.riichi else str(report["chosen"])
+            self.last_hint_report = report
+            self.last_hint_recommendation = recommendation
             after = self._shanten_after_discard(p, recommendation)
             visible = self._visible_counts(0)
             p.hand.remove(recommendation)
@@ -1425,6 +1434,9 @@ class MahjongGame:
                 else:
                     display_label = label.split("/")[0]
                 print(f"    {display_label}: {row}")
+        else:
+            self.last_hint_report = None
+            self.last_hint_recommendation = None
 
     def _score_label(self, sb: ScoreBreakdown) -> str:
         names = [x.name for x in sb.yakuman] or [x.name for x in sb.yaku]

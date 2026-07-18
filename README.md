@@ -2,6 +2,11 @@
 
 ## Updates 7/18/2026
 
+- Integrated **Advanced AI v1** as a full-name desktop selection while retaining Basic AI v1. Blank desktop seeds now generate and display a secure random replay seed; manually entered seeds remain deterministic.
+- Added `simulate_desktop_game.py` to complete East matches through the same discard, win, riichi, chi/pon/kan, pass, and settlement prompts used by the desktop UI.
+- Promoted hint recommendations into the desktop action panel and highlight the recommended hand tile. Chi buttons now show only the legal sequences supplied by the engine.
+- Fixed Chinese/Japanese hint tracker rows that were hidden by an indentation error; all four suit/honor remaining-count rows now display in every language.
+- Completed 19 simulated desktop match runs in this update, including Advanced AI v1 hint games, Basic AI v1 normal games, fixed-seed replay, and active-call games, with no crashes or invalid point totals.
 - Removed previously tracked Python bytecode caches from the repository. Existing `.gitignore` rules now keep regenerated `__pycache__`, `.pyc`, test/tool caches, virtual environments, and macOS metadata out of future commits.
 
 ## Updates 7/17/2026
@@ -340,12 +345,21 @@ python desktop_ui.py
 ```
 
 The setup screen selects language, Basic AI v1 or Advanced AI v1 opponents,
-temperature, normal/hint mode, and an optional replay seed. During play, click a
+temperature, normal/hint mode, and an optional replay seed. Leave the seed blank to
+generate a random seed; the actual value is shown in the game log and center panel
+so the match can be replayed later. During play, click a
 tile to discard and use the action panel for ron/tsumo, riichi, chi/pon/kan, passing,
 and proceeding after settlement. The right-side log retains full scoring and hint
 details. This first desktop version is a compatibility UI; a later phase can replace
 the prompt bridge with a native event/action API and add packaged app launchers,
 tile artwork, animation, sound, and save/resume.
+
+Run complete desktop-input stability simulations without manually clicking:
+
+```bash
+python simulate_desktop_game.py --games 4 --profile advanced_v1 \
+  --temperature 0.2 --assist hint --calls accept --json desktop_simulation.json
+```
 
 Run an interactive East-round match:
 
@@ -494,7 +508,14 @@ The simulator includes fixed walls after the initial shuffle, ron/tsumo settleme
 python desktop_ui.py
 ```
 
-设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式和可选复现种子。牌局中直接点击手牌弃牌，通过右侧操作区选择荣和/自摸、立直、吃碰杠、跳过和结算后继续；右侧牌局记录会保留完整计分与提示信息。当前桌面版属于第一阶段兼容 UI，后续可以把输入桥接替换成正式事件接口，并加入应用打包、牌面美术、动画、音效和存档继续功能。
+设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式和可选复现种子。种子留空时会自动生成随机值，并在中央牌桌和牌局记录中显示，之后可以手动输入该值复现对局。牌局中直接点击手牌弃牌，通过右侧操作区选择荣和/自摸、立直、吃碰杠、跳过和结算后继续；提示模式会在操作区直接显示推荐牌、向听和押引模式，并高亮推荐手牌。右侧牌局记录会保留完整计分、候选比较和记牌器信息。当前桌面版属于第一阶段兼容 UI，后续可以把输入桥接替换成正式事件接口，并加入应用打包、牌面美术、动画、音效和存档继续功能。
+
+无需手动点击即可运行完整桌面输入稳定性模拟：
+
+```bash
+python simulate_desktop_game.py --games 4 --profile advanced_v1 \
+  --temperature 0.2 --assist hint --calls accept --json desktop_simulation.json
+```
 
 启动主视角东风战：
 

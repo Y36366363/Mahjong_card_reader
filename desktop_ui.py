@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import queue
+import secrets
 import threading
 import tkinter as tk
 from contextlib import redirect_stdout
@@ -23,6 +24,15 @@ COLORS = {
 }
 
 TABLE_POSITIONS = {0: (2, 1), 1: (1, 2), 2: (0, 1), 3: (1, 0)}
+PROFILE_DISPLAY_TO_ID = {
+    profile.display_name: profile_id for profile_id, profile in AI_PROFILES.items()
+}
+
+
+def resolve_desktop_seed(seed_text: str) -> int:
+    """Use a recorded random seed when blank, or preserve a user-provided seed."""
+    value = seed_text.strip()
+    return int(value) if value else secrets.randbits(63)
 
 
 def classify_prompt(prompt: str) -> str:
@@ -61,8 +71,10 @@ class MahjongDesktopApp:
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.responses: queue.Queue[str] = queue.Queue()
         self.game: MahjongGame | None = None
+        self.active_seed: int | None = None
         self.running = False
         self.pending_kind: str | None = None
+        self.recommended_tile: str | None = None
         self._last_hand: tuple[str, ...] = ()
         self._configure_style()
         self._build_setup()
@@ -93,7 +105,7 @@ class MahjongDesktopApp:
         ).grid(row=1, column=0, columnspan=2, pady=(0, 26))
 
         self.language_var = tk.StringVar(value="zh")
-        self.profile_var = tk.StringVar(value="basic_v1")
+        self.profile_var = tk.StringVar(value=AI_PROFILES["basic_v1"].display_name)
         self.temperature_var = tk.DoubleVar(value=0.2)
         self.assist_var = tk.StringVar(value="hint")
         self.seed_var = tk.StringVar(value="")
@@ -104,13 +116,13 @@ class MahjongDesktopApp:
             )),
             ("电脑版本 / AI", ttk.Combobox(
                 card, textvariable=self.profile_var, state="readonly",
-                values=tuple(AI_PROFILES), width=24,
+                values=tuple(PROFILE_DISPLAY_TO_ID), width=24,
             )),
             ("提示模式 / Assist", ttk.Combobox(
                 card, textvariable=self.assist_var, state="readonly",
                 values=("hint", "normal"), width=24,
             )),
-            ("牌山种子 / Seed", ttk.Entry(card, textvariable=self.seed_var, width=27)),
+            ("牌山种子 / Seed（留空随机）", ttk.Entry(card, textvariable=self.seed_var, width=27)),
         ]
         for row, (label, widget) in enumerate(fields, 2):
             tk.Label(card, text=label, bg=COLORS["panel"], fg=COLORS["ink"]).grid(
@@ -202,12 +214,11 @@ class MahjongDesktopApp:
 
     def _start(self) -> None:
         try:
-            seed_text = self.seed_var.get().strip()
-            seed = int(seed_text) if seed_text else None
+            seed = resolve_desktop_seed(self.seed_var.get())
         except ValueError:
             messagebox.showerror("Invalid seed", "Seed 必须是整数或留空。")
             return
-        profile = self.profile_var.get()
+        profile = PROFILE_DISPLAY_TO_ID.get(self.profile_var.get(), self.profile_var.get())
         temperature = float(self.temperature_var.get())
         self._build_game()
         self.game = MahjongGame(
@@ -218,6 +229,8 @@ class MahjongDesktopApp:
             assist_mode=self.assist_var.get(),
             language=self.language_var.get(),
         )
+        self.active_seed = seed
+        self._append_log(f"Replay seed / 复现种子: {seed}\n")
         self.running = True
         threading.Thread(target=self._run_game, daemon=True).start()
 
@@ -265,6 +278,19 @@ class MahjongDesktopApp:
             tk.Label(
                 self.action_frame, text="请点击下方手牌", bg=COLORS["panel"], fg=COLORS["accent"],
             ).pack(anchor="w")
+            if self.game is not None and self.game.assist_mode == "hint":
+                self.recommended_tile = self.game.last_hint_recommendation
+                report = self.game.last_hint_report
+                mode = str(report["mode"]) if report else "locked-riichi"
+                shanten = self.game._standard_shanten(self.game.players[0])
+                tk.Label(
+                    self.action_frame,
+                    text=(
+                        f"推荐弃牌：{self.recommended_tile or '—'}\n"
+                        f"当前向听：{shanten}  ·  模式：{mode}"
+                    ),
+                    justify="left", bg="#fff3cc", fg=COLORS["ink"], padx=8, pady=7,
+                ).pack(fill="x", pady=(7, 0))
         elif self.pending_kind == "yes_no":
             ttk.Button(self.action_frame, text="是 / Yes", command=lambda: self._respond("y")).pack(
                 side="left", fill="x", expand=True, padx=(0, 4)
@@ -273,9 +299,14 @@ class MahjongDesktopApp:
                 side="left", fill="x", expand=True, padx=(4, 0)
             )
         elif self.pending_kind == "chi":
-            for value, label in (("0", "跳过"), ("1", "吃法 1"), ("2", "吃法 2"), ("3", "吃法 3")):
+            ttk.Button(
+                self.action_frame, text="跳过 / Pass", command=lambda: self._respond("0")
+            ).pack(fill="x", pady=2)
+            options = self.game.last_chi_options if self.game is not None else []
+            for index, sequence in enumerate(options, 1):
                 ttk.Button(
-                    self.action_frame, text=label, command=lambda v=value: self._respond(v)
+                    self.action_frame, text=f"吃 {' '.join(sequence)}",
+                    command=lambda value=str(index): self._respond(value),
                 ).pack(fill="x", pady=2)
         elif self.pending_kind == "continue":
             ttk.Button(self.action_frame, text="继续下一局", command=lambda: self._respond("")).pack(fill="x")
@@ -290,6 +321,7 @@ class MahjongDesktopApp:
         if self.pending_kind is None:
             return
         self.pending_kind = None
+        self.recommended_tile = None
         self.responses.put(value)
         self.prompt_label.config(text="电脑行动中…")
         self._clear_actions()
@@ -336,6 +368,7 @@ class MahjongDesktopApp:
                     f"东 {game.round_hand + 1} 局\n"
                     f"本场 {game.honba}  ·  立直棒 {game.riichi_sticks}\n"
                     f"牌山 {len(game.wall)}\n宝牌 {doras}"
+                    f"\n种子 {self.active_seed}"
                 )
             )
             player = game.players[0]
@@ -365,9 +398,13 @@ class MahjongDesktopApp:
             suit_color = {
                 "m": "#b33b35", "p": "#2c63a0", "s": "#278153",
             }.get(tile[-1:] if len(tile) == 2 else "", COLORS["ink"])
+            recommended = active and tile == self.recommended_tile
             button = tk.Button(
-                self.hand_frame, text=tile, width=4, height=2,
-                bg=COLORS["tile"], fg=suit_color, relief="raised", bd=2,
+                self.hand_frame, text=f"★{tile}" if recommended else tile, width=4, height=2,
+                bg="#ffe2a3" if recommended else COLORS["tile"],
+                fg=suit_color, relief="raised", bd=4 if recommended else 2,
+                highlightbackground=COLORS["accent"] if recommended else COLORS["table"],
+                highlightthickness=2 if recommended else 0,
                 font=("Arial", 12, "bold"),
                 command=lambda value=tile: self._respond(value),
                 state="normal" if active else "disabled",

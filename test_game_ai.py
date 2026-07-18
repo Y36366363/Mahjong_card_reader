@@ -105,6 +105,7 @@ class AdvancedAITests(unittest.TestCase):
         with redirect_stdout(StringIO()):
             with patch("builtins.input", side_effect=["2"]):
                 self.assertEqual(game._choose_user_call("3m", chi), chi[1])
+        self.assertEqual(game.last_chi_options, [])
 
     def test_hint_view_contains_status_rivers_and_tracker(self) -> None:
         game = MahjongGame(interactive=True, assist_mode="hint", ai_levels=["advanced"] * 4)
@@ -138,6 +139,10 @@ class AdvancedAITests(unittest.TestCase):
         self.assertIn("牌河", text)
         self.assertIn("推荐弃牌", text)
         self.assertIn("记牌器", text)
+        self.assertIn("万子:", text)
+        self.assertIn("筒子:", text)
+        self.assertIn("索子:", text)
+        self.assertIn("字牌:", text)
         self.assertNotIn("Your hand", text)
 
     def test_chinese_interaction_prompts(self) -> None:
