@@ -9,6 +9,10 @@ from desktop_ui import (
     TABLE_POSITIONS,
     QueueWriter,
     classify_prompt,
+    concealed_tile_backs,
+    display_hand_order,
+    display_text,
+    display_tile,
     resolve_desktop_seed,
 )
 
@@ -39,6 +43,24 @@ class DesktopUIAdapterTests(unittest.TestCase):
         self.assertEqual(resolve_desktop_seed(" 20260718 "), 20260718)
         with patch("desktop_ui.secrets.randbits", return_value=987654321):
             self.assertEqual(resolve_desktop_seed(""), 987654321)
+
+    def test_chinese_tile_labels_are_display_only(self) -> None:
+        self.assertEqual(display_tile("E", "zh"), "东")
+        self.assertEqual(display_tile("P", "zh"), "白")
+        self.assertEqual(display_tile("5m", "zh"), "5万")
+        self.assertEqual(display_tile("0s", "zh"), "赤5索")
+        self.assertEqual(display_tile("5m", "en"), "5m")
+        self.assertEqual(display_text("是否碰 E？ 手牌 5m", "zh"), "是否碰 东？ 手牌 5万")
+
+    def test_draw_is_visually_separated_at_far_right(self) -> None:
+        ordered = display_hand_order(["1m", "2m", "2m", "9p"], "2m")
+        self.assertEqual(ordered[-1], ("2m", True))
+        self.assertEqual([tile for tile, _ in ordered], ["1m", "2m", "9p", "2m"])
+
+    def test_opponent_concealed_tiles_show_the_correct_count(self) -> None:
+        backs = concealed_tile_backs(13)
+        self.assertEqual(backs.count("🀫"), 13)
+        self.assertIn("\n", backs)
 
 
 if __name__ == "__main__":

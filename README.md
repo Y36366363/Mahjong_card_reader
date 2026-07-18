@@ -2,6 +2,12 @@
 
 ## Updates 7/18/2026
 
+- Improved the desktop play view after hands-on testing: the latest drawn tile remains separated at the far right, opponent concealed-tile counts are rendered as tile backs, and Chinese tiles display as `东南西北白发中` plus `万/筒/索` labels without changing internal tile IDs.
+- Added pre-discard riichi guidance. Every discard that leaves a legal closed tenpai is marked `可立直`; selecting it opens the existing explicit riichi yes/no confirmation.
+- Extended hint mode to call opportunities. Pon, chi, and kan prompts now show whether Advanced AI v1 recommends accepting or passing, without changing the player's final choice or contaminating AI statistics.
+- Clarified the currently supported kan prompt as **open kan / daiminkan / 大明杠**, explicitly stating that it uses an opponent discard. Closed kan and added kan remain future rule work.
+- Added a scalable offline setup background with dark-green table felt, a warm frame, and restrained gold corner decoration. The controls remain high-contrast and the background requires no external asset or network access.
+- Added display-helper regression tests and completed 10 automated Advanced AI v1 hint-mode East matches with active call choices, with no crashes, invalid point totals, or incomplete hint records.
 - Integrated **Advanced AI v1** as a full-name desktop selection while retaining Basic AI v1. Blank desktop seeds now generate and display a secure random replay seed; manually entered seeds remain deterministic.
 - Added `simulate_desktop_game.py` to complete East matches through the same discard, win, riichi, chi/pon/kan, pass, and settlement prompts used by the desktop UI.
 - Promoted hint recommendations into the desktop action panel and highlight the recommended hand tile. Chi buttons now show only the legal sequences supplied by the engine.
@@ -508,7 +514,9 @@ The simulator includes fixed walls after the initial shuffle, ron/tsumo settleme
 python desktop_ui.py
 ```
 
-设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式和可选复现种子。种子留空时会自动生成随机值，并在中央牌桌和牌局记录中显示，之后可以手动输入该值复现对局。牌局中直接点击手牌弃牌，通过右侧操作区选择荣和/自摸、立直、吃碰杠、跳过和结算后继续；提示模式会在操作区直接显示推荐牌、向听和押引模式，并高亮推荐手牌。右侧牌局记录会保留完整计分、候选比较和记牌器信息。当前桌面版属于第一阶段兼容 UI，后续可以把输入桥接替换成正式事件接口，并加入应用打包、牌面美术、动画、音效和存档继续功能。
+设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式和可选复现种子。种子留空时会自动生成随机值，并在中央牌桌和牌局记录中显示，之后可以手动输入该值复现对局。牌局中直接点击手牌弃牌：本巡摸牌会与原手牌分开并固定显示在最右侧，其他三家的暗手会按真实张数显示为空白牌背。中文界面只在显示层把内部牌名转换为东南西北白发中和万/筒/索，计算逻辑与复现种子不受影响。
+
+闭手达到听牌时，所有能够立直的弃牌会显示“可立直”；点击其中一张后，右侧会出现立直的是/否确认。通过右侧操作区还可以选择荣和/自摸、吃碰杠、跳过和结算后继续。提示模式会在出牌时显示推荐牌、向听和押引模式，并在吃、碰、大明杠机会出现时显示高级电脑建议接受或跳过。当前杠提示均为使用对手弃牌的“大明杠”；主动暗杠与加杠尚未加入。右侧牌局记录会保留完整计分、候选比较和记牌器信息。当前桌面版属于第一阶段兼容 UI，后续可以把输入桥接替换成正式事件接口，并加入应用打包、牌面美术、动画、音效和存档继续功能。
 
 无需手动点击即可运行完整桌面输入稳定性模拟：
 

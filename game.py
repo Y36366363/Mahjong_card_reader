@@ -130,6 +130,7 @@ class PlayerState:
     riichi: bool = False
     temporary_furiten: bool = False
     riichi_furiten: bool = False
+    last_drawn_tile: str | None = None
     stats: PlayerStats = field(default_factory=PlayerStats)
 
     def sort(self) -> None:
@@ -208,6 +209,9 @@ class MahjongGame:
         self.last_hint_report: dict[str, object] | None = None
         self.last_hint_recommendation: str | None = None
         self.last_chi_options: list[list[str]] = []
+        self.last_call_recommendation: str | None = None
+        self.last_call_report: dict[str, object] | None = None
+        self.last_riichi_candidates: list[str] = []
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -405,6 +409,7 @@ class MahjongGame:
         for p in self.players:
             p.hand.clear(); p.melds.clear(); p.river.clear(); p.riichi = False
             p.temporary_furiten = False; p.riichi_furiten = False
+            p.last_drawn_tile = None
         for _ in range(13):
             for offset in range(4):
                 self.players[(self.dealer + offset) % 4].hand.append(self.wall.pop(0))
@@ -428,6 +433,7 @@ class MahjongGame:
             p.temporary_furiten = False
             draw = self.wall.pop(0)
             p.hand.append(draw); p.sort()
+            p.last_drawn_tile = draw
             score = self._try_score(turn, draw, "tsumo")
             if score and (turn != 0 or self._yes_no(self._t(
                 f"Tsumo {draw} for {self._score_label(score)}?",
@@ -441,6 +447,7 @@ class MahjongGame:
             # the drawn tile must be discarded unchanged.
             discard = draw if p.riichi else self._choose_discard(turn)
             p.hand.remove(discard); p.river.append(discard)
+            p.last_drawn_tile = None
             if turn == 0 and self.interactive:
                 print(self._t(f"You discarded {discard}.", f"你打出了 {discard}。"))
 
@@ -1107,7 +1114,7 @@ class MahjongGame:
                 opts = []
             chosen: tuple[str, list[str]] | None = None
             if caller == 0 and opts and self.interactive:
-                chosen = self._choose_user_call(tile, opts)
+                chosen = self._choose_user_call(tile, opts, caller=caller)
             elif opts and (caller != 0 or not self.interactive):
                 seat_wind = WINDS[(caller - self.dealer) % 4]
                 if self.players[caller].ai_level == "advanced":
@@ -1136,6 +1143,7 @@ class MahjongGame:
                     # one so the total number of drawable tiles stays correct.
                     replacement = self.dead_wall.pop()
                     p.hand.append(replacement); p.sort()
+                    p.last_drawn_tile = replacement
                     if self.wall:
                         self.wall.pop()
                     indicator_pos = 4 + 2 * len(self.dora_indicators)
@@ -1167,6 +1175,7 @@ class MahjongGame:
                     self._show_state(replacement if kind == "kan" else tile, event_label=event)
                 discard = self._choose_discard(caller)
                 p.hand.remove(discard); p.river.append(discard)
+                p.last_drawn_tile = None
                 print(self._t(
                     f"{self._name(p)} discarded {discard}.",
                     f"{self._name(p)}打出了 {discard}。",
@@ -1181,11 +1190,31 @@ class MahjongGame:
         return None
 
     def _choose_user_call(
-        self, tile: str, opts: list[tuple[str, list[str]]]
+        self, tile: str, opts: list[tuple[str, list[str]]], *, caller: int = 0
     ) -> tuple[str, list[str]] | None:
         """Prompt pon/kan as yes-no and chi as an explicit sequence choice."""
+        def is_usable(option: tuple[str, list[str]]) -> bool:
+            needed = option[1].copy()
+            needed.remove(tile)
+            return all(
+                self.players[caller].hand.count(x) >= needed.count(x)
+                for x in set(needed)
+            )
+
+        usable_for_analysis = [option for option in opts if is_usable(option)]
+        recommendation = self._advanced_call_choice(caller, tile, usable_for_analysis, record=False)
+        self.last_call_recommendation = recommendation[0] if recommendation else "pass"
+        self.last_call_report = {
+            "tile": tile,
+            "available": [kind for kind, _ in opts],
+            "recommended": self.last_call_recommendation,
+        }
         by_kind = {kind: [option for option in opts if option[0] == kind] for kind in ("kan", "pon", "chi")}
-        if by_kind["kan"] and self._yes_no(self._t(f"Kan {tile}?", f"是否杠 {tile}？"), False):
+        if by_kind["kan"] and self._yes_no(self._t(
+            f"Open kan (daiminkan) {tile} using the opponent's discard?",
+            f"是否用对手弃牌 {tile} 进行大明杠？",
+            f"相手の捨て牌 {tile} で大明槓しますか？",
+        ), False):
             return by_kind["kan"][0]
         if by_kind["pon"] and self._yes_no(self._t(f"Pon {tile}?", f"是否碰 {tile}？"), False):
             return by_kind["pon"][0]
@@ -1209,7 +1238,7 @@ class MahjongGame:
         return None
 
     def _advanced_call_choice(
-        self, caller: int, tile: str, opts: list[tuple[str, list[str]]]
+        self, caller: int, tile: str, opts: list[tuple[str, list[str]]], *, record: bool = True
     ) -> tuple[str, list[str]] | None:
         """Conservative, deterministic call policy for the advanced AI."""
         if not opts:
@@ -1266,7 +1295,7 @@ class MahjongGame:
             ))
         selected = min(choices, default=None)
         chosen = selected[1] if selected else None
-        if selected is not None:
+        if selected is not None and record:
             after_shanten, after_ukeire = selected[2], selected[3]
             p.stats.call_decisions += 1
             p.stats.call_shanten_gain += before_shanten - after_shanten
@@ -1350,6 +1379,11 @@ class MahjongGame:
             recommendation = draw if p.riichi else str(report["chosen"])
             self.last_hint_report = report
             self.last_hint_recommendation = recommendation
+            self.last_riichi_candidates = [
+                tile for tile in sorted(set(p.hand), key=tile_sort_key)
+                if p.is_closed and not p.riichi and p.points >= 1000
+                and self._shanten_after_discard(p, tile) == 0
+            ]
             after = self._shanten_after_discard(p, recommendation)
             visible = self._visible_counts(0)
             p.hand.remove(recommendation)
@@ -1437,6 +1471,11 @@ class MahjongGame:
         else:
             self.last_hint_report = None
             self.last_hint_recommendation = None
+            self.last_riichi_candidates = [
+                tile for tile in sorted(set(p.hand), key=tile_sort_key)
+                if p.is_closed and not p.riichi and p.points >= 1000
+                and self._shanten_after_discard(p, tile) == 0
+            ]
 
     def _score_label(self, sb: ScoreBreakdown) -> str:
         names = [x.name for x in sb.yakuman] or [x.name for x in sb.yaku]

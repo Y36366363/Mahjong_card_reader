@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import queue
+import re
 import secrets
 import threading
 import tkinter as tk
@@ -27,6 +28,43 @@ TABLE_POSITIONS = {0: (2, 1), 1: (1, 2), 2: (0, 1), 3: (1, 0)}
 PROFILE_DISPLAY_TO_ID = {
     profile.display_name: profile_id for profile_id, profile in AI_PROFILES.items()
 }
+
+ZH_HONORS = {"E": "东", "S": "南", "W": "西", "N": "北", "P": "白", "F": "发", "C": "中"}
+
+
+def display_tile(tile: str, language: str) -> str:
+    """Translate tile notation for display without changing engine tile IDs."""
+    if language != "zh":
+        return tile
+    if tile in ZH_HONORS:
+        return ZH_HONORS[tile]
+    if len(tile) == 2 and tile[1] in "mps":
+        suit = {"m": "万", "p": "筒", "s": "索"}[tile[1]]
+        return ("赤5" if tile[0] == "0" else tile[0]) + suit
+    return tile
+
+
+def display_hand_order(hand: list[str], drawn: str | None) -> list[tuple[str, bool]]:
+    """Keep the latest draw separate at the far right of the visual hand."""
+    tiles = list(hand)
+    if drawn in tiles:
+        tiles.remove(drawn)
+        return [(tile, False) for tile in tiles] + [(drawn, True)]
+    return [(tile, False) for tile in tiles]
+
+
+def concealed_tile_backs(count: int, per_line: int = 7) -> str:
+    backs = ["🀫"] * count
+    return "\n".join(" ".join(backs[i:i + per_line]) for i in range(0, count, per_line)) or "—"
+
+
+def display_text(text: str, language: str) -> str:
+    if language != "zh":
+        return text
+    return re.sub(
+        r"(?<![A-Za-z0-9])([0-9][mps]|[ESWNPFC])(?![A-Za-z0-9])",
+        lambda match: display_tile(match.group(1), language), text,
+    )
 
 
 def resolve_desktop_seed(seed_text: str) -> int:
@@ -91,10 +129,11 @@ class MahjongDesktopApp:
         style.configure("Title.TLabel", font=("Arial", 24, "bold"))
 
     def _build_setup(self) -> None:
-        self.setup = tk.Frame(self.root, bg=COLORS["bg"])
+        self.setup = tk.Canvas(self.root, bg=COLORS["bg"], highlightthickness=0)
         self.setup.pack(fill="both", expand=True)
+        self.setup.bind("<Configure>", self._draw_setup_background)
         card = tk.Frame(self.setup, bg=COLORS["panel"], padx=42, pady=34)
-        card.place(relx=0.5, rely=0.5, anchor="center")
+        self.setup_card_window = self.setup.create_window(640, 410, window=card, anchor="center")
         tk.Label(
             card, text="Mahjong Card Reader", bg=COLORS["panel"], fg=COLORS["ink"],
             font=("Arial", 26, "bold"),
@@ -145,6 +184,26 @@ class MahjongDesktopApp:
         ttk.Button(card, text="开始东风战", style="Accent.TButton", command=self._start).grid(
             row=7, column=0, columnspan=2, sticky="ew", pady=(28, 0)
         )
+
+    def _draw_setup_background(self, event: tk.Event) -> None:
+        """Draw a scalable, offline table-felt background behind the setup card."""
+        canvas = self.setup
+        canvas.delete("background")
+        w, h = event.width, event.height
+        canvas.create_rectangle(0, 0, w, h, fill="#08261f", outline="", tags="background")
+        margin = max(24, min(w, h) // 22)
+        canvas.create_rectangle(margin, margin, w - margin, h - margin, fill="#124d40",
+                                outline="#9a7130", width=5, tags="background")
+        canvas.create_rectangle(margin + 11, margin + 11, w - margin - 11, h - margin - 11,
+                                outline="#315f50", width=2, tags="background")
+        for x, y in ((margin + 38, margin + 38), (w - margin - 38, margin + 38),
+                     (margin + 38, h - margin - 38), (w - margin - 38, h - margin - 38)):
+            canvas.create_oval(x - 20, y - 20, x + 20, y + 20, outline="#c69a48",
+                               width=2, tags="background")
+            canvas.create_text(x, y, text="麻", fill="#d5b667", font=("Arial", 15, "bold"),
+                               tags="background")
+        canvas.tag_lower("background")
+        canvas.coords(self.setup_card_window, w / 2, h / 2)
 
     def _build_game(self) -> None:
         self.setup.destroy()
@@ -272,7 +331,8 @@ class MahjongDesktopApp:
 
     def _show_prompt(self, prompt: str) -> None:
         self.pending_kind = classify_prompt(prompt)
-        self.prompt_label.config(text=prompt.strip() or "继续")
+        language = self.game.language if self.game is not None else "zh"
+        self.prompt_label.config(text=display_text(prompt.strip(), language) or "继续")
         self._clear_actions()
         if self.pending_kind == "discard":
             tk.Label(
@@ -286,12 +346,22 @@ class MahjongDesktopApp:
                 tk.Label(
                     self.action_frame,
                     text=(
-                        f"推荐弃牌：{self.recommended_tile or '—'}\n"
+                        f"推荐弃牌：{display_tile(self.recommended_tile, self.game.language) if self.recommended_tile else '—'}\n"
                         f"当前向听：{shanten}  ·  模式：{mode}"
+                        + ("\n弃出标有「可立直」的牌后，会出现立直确认。"
+                           if self.game.last_riichi_candidates else "")
                     ),
                     justify="left", bg="#fff3cc", fg=COLORS["ink"], padx=8, pady=7,
                 ).pack(fill="x", pady=(7, 0))
         elif self.pending_kind == "yes_no":
+            if self.game is not None and self.game.assist_mode == "hint" and self.game.last_call_report:
+                report = self.game.last_call_report
+                current = "kan" if any(x in prompt for x in ("大明杠", "daiminkan", "大明槓")) else "pon" if any(x in prompt for x in ("碰", "Pon", "ポン")) else None
+                if current:
+                    recommended = report["recommended"]
+                    advice = "建议接受" if recommended == current else "建议跳过"
+                    tk.Label(self.action_frame, text=f"高级AI鸣牌提示：{advice}", bg="#fff3cc",
+                             fg=COLORS["ink"], padx=8, pady=7).pack(fill="x", pady=(0, 7))
             ttk.Button(self.action_frame, text="是 / Yes", command=lambda: self._respond("y")).pack(
                 side="left", fill="x", expand=True, padx=(0, 4)
             )
@@ -299,13 +369,20 @@ class MahjongDesktopApp:
                 side="left", fill="x", expand=True, padx=(4, 0)
             )
         elif self.pending_kind == "chi":
+            if self.game is not None and self.game.assist_mode == "hint" and self.game.last_call_report:
+                recommended = self.game.last_call_report["recommended"]
+                tk.Label(
+                    self.action_frame,
+                    text="高级AI鸣牌提示：建议选择吃牌" if recommended == "chi" else "高级AI鸣牌提示：建议跳过",
+                    bg="#fff3cc", fg=COLORS["ink"], padx=8, pady=7,
+                ).pack(fill="x", pady=(0, 7))
             ttk.Button(
                 self.action_frame, text="跳过 / Pass", command=lambda: self._respond("0")
             ).pack(fill="x", pady=2)
             options = self.game.last_chi_options if self.game is not None else []
             for index, sequence in enumerate(options, 1):
                 ttk.Button(
-                    self.action_frame, text=f"吃 {' '.join(sequence)}",
+                    self.action_frame, text=f"吃 {' '.join(display_tile(x, self.game.language) for x in sequence)}",
                     command=lambda value=str(index): self._respond(value),
                 ).pack(fill="x", pady=2)
         elif self.pending_kind == "continue":
@@ -349,9 +426,10 @@ class MahjongDesktopApp:
                 if player.riichi:
                     status.append("立直 / Riichi")
                 melds = " / ".join(
-                    f"{meld.kind}:{' '.join(meld.tiles)}" for meld in list(player.melds)
+                    f"{game._meld_name(meld.kind)}:{' '.join(display_tile(x, game.language) for x in meld.tiles)}" for meld in list(player.melds)
                 ) or "门清 / Closed"
-                river = " ".join(list(player.river)) or "—"
+                river = " ".join(display_tile(x, game.language) for x in list(player.river)) or "—"
+                concealed = "" if seat == 0 else f"\n暗手 {len(player.hand)}张:\n{concealed_tile_backs(len(player.hand))}"
                 label = self.player_labels[seat]
                 if label is None:
                     continue
@@ -359,10 +437,10 @@ class MahjongDesktopApp:
                     text=(
                         f"{game._name(player)}  {player.points:,}\n"
                         f"{' · '.join(status) if status else ' '}\n"
-                        f"{melds}\n河: {river}"
+                        f"{melds}{concealed}\n河: {river}"
                     )
                 )
-            doras = " ".join(dora_from_indicator(tile) for tile in list(game.dora_indicators)) or "—"
+            doras = " ".join(display_tile(dora_from_indicator(tile), game.language) for tile in list(game.dora_indicators)) or "—"
             self.center_label.config(
                 text=(
                     f"东 {game.round_hand + 1} 局\n"
@@ -374,7 +452,7 @@ class MahjongDesktopApp:
             player = game.players[0]
             self.meld_label.config(
                 text="副露: " + (" / ".join(
-                    f"{m.kind}({' '.join(m.tiles)})" for m in list(player.melds)
+                    f"{game._meld_name(m.kind)}({' '.join(display_tile(x, game.language) for x in m.tiles)})" for m in list(player.melds)
                 ) or "无")
             )
             self._render_hand()
@@ -386,21 +464,26 @@ class MahjongDesktopApp:
     def _render_hand(self, *, force: bool = False) -> None:
         if self.game is None or not hasattr(self, "hand_frame"):
             return
-        hand = tuple(self.game.players[0].hand)
+        player = self.game.players[0]
+        hand = tuple(player.hand)
         active = self.pending_kind == "discard"
-        signature = hand + (("active" if active else "idle"),)
+        signature = hand + ((player.last_drawn_tile or ""), ("active" if active else "idle"))
         if not force and signature == self._last_hand:
             return
         self._last_hand = signature
         for child in self.hand_frame.winfo_children():
             child.destroy()
-        for tile in hand:
+        for tile, is_drawn in display_hand_order(list(hand), player.last_drawn_tile):
             suit_color = {
                 "m": "#b33b35", "p": "#2c63a0", "s": "#278153",
             }.get(tile[-1:] if len(tile) == 2 else "", COLORS["ink"])
             recommended = active and tile == self.recommended_tile
+            riichi_candidate = active and tile in self.game.last_riichi_candidates
+            label = display_tile(tile, self.game.language)
             button = tk.Button(
-                self.hand_frame, text=f"★{tile}" if recommended else tile, width=4, height=2,
+                self.hand_frame,
+                text=("★" if recommended else "") + label + ("\n可立直" if riichi_candidate else ""),
+                width=5, height=3 if riichi_candidate else 2,
                 bg="#ffe2a3" if recommended else COLORS["tile"],
                 fg=suit_color, relief="raised", bd=4 if recommended else 2,
                 highlightbackground=COLORS["accent"] if recommended else COLORS["table"],
@@ -409,7 +492,7 @@ class MahjongDesktopApp:
                 command=lambda value=tile: self._respond(value),
                 state="normal" if active else "disabled",
             )
-            button.pack(side="left", padx=2)
+            button.pack(side="left", padx=(12 if is_drawn else 2, 2))
 
     def _close(self) -> None:
         if self.running:

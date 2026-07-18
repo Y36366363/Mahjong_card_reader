@@ -107,6 +107,26 @@ class AdvancedAITests(unittest.TestCase):
                 self.assertEqual(game._choose_user_call("3m", chi), chi[1])
         self.assertEqual(game.last_chi_options, [])
 
+    def test_user_gets_riichi_confirmation_after_a_tenpai_discard(self) -> None:
+        game = MahjongGame(interactive=True, language="zh")
+        player = game.players[0]
+        player.hand = "1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P 9m".split()
+        player.sort()
+        with patch("builtins.input", side_effect=["9m", "是"]):
+            self.assertEqual(game._choose_discard(0), "9m")
+        self.assertTrue(player.riichi)
+        self.assertEqual(player.points, 24_000)
+
+    def test_hint_call_analysis_is_recorded_without_mutating_stats(self) -> None:
+        game = MahjongGame(interactive=True, assist_mode="hint", ai_levels=["advanced"] * 4)
+        player = game.players[0]
+        player.hand = "E E 1m 2m 3m 4p 5p 6p 7s 8s 9s P P".split()
+        before = player.stats.call_decisions
+        with patch("builtins.input", side_effect=["n"]):
+            self.assertIsNone(game._choose_user_call("E", [("pon", ["E"] * 3)]))
+        self.assertIn(game.last_call_recommendation, {"pon", "pass"})
+        self.assertEqual(player.stats.call_decisions, before)
+
     def test_hint_view_contains_status_rivers_and_tracker(self) -> None:
         game = MahjongGame(interactive=True, assist_mode="hint", ai_levels=["advanced"] * 4)
         game.wall = ["1m"] * 20
