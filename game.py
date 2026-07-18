@@ -208,6 +208,7 @@ class MahjongGame:
         self._hand_outcomes: list[str | None] = [None] * 4
         self.last_hint_report: dict[str, object] | None = None
         self.last_hint_recommendation: str | None = None
+        self.last_hint_hand: tuple[str, ...] = ()
         self.last_chi_options: list[list[str]] = []
         self.last_call_recommendation: str | None = None
         self.last_call_report: dict[str, object] | None = None
@@ -1379,6 +1380,7 @@ class MahjongGame:
             recommendation = draw if p.riichi else str(report["chosen"])
             self.last_hint_report = report
             self.last_hint_recommendation = recommendation
+            self.last_hint_hand = tuple(p.hand)
             self.last_riichi_candidates = [
                 tile for tile in sorted(set(p.hand), key=tile_sort_key)
                 if p.is_closed and not p.riichi and p.points >= 1000
@@ -1471,6 +1473,7 @@ class MahjongGame:
         else:
             self.last_hint_report = None
             self.last_hint_recommendation = None
+            self.last_hint_hand = tuple(p.hand)
             self.last_riichi_candidates = [
                 tile for tile in sorted(set(p.hand), key=tile_sort_key)
                 if p.is_closed and not p.riichi and p.points >= 1000

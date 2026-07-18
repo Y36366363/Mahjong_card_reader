@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from desktop_ui import (
+    FONT_SCALES,
     PROFILE_DISPLAY_TO_ID,
     TABLE_POSITIONS,
     QueueWriter,
@@ -14,6 +15,7 @@ from desktop_ui import (
     display_text,
     display_tile,
     resolve_desktop_seed,
+    valid_hint_tile,
 )
 
 
@@ -61,6 +63,17 @@ class DesktopUIAdapterTests(unittest.TestCase):
         backs = concealed_tile_backs(13)
         self.assertEqual(backs.count("🀫"), 13)
         self.assertIn("\n", backs)
+
+    def test_stale_hint_is_never_shown_for_an_absent_tile(self) -> None:
+        hand = ["1m", "2m", "E"]
+        self.assertEqual(valid_hint_tile(hand, "2m"), "2m")
+        self.assertIsNone(valid_hint_tile(hand, "9p"))
+        self.assertIsNone(valid_hint_tile(hand, None))
+
+    def test_three_font_sizes_are_ordered_and_medium_is_neutral(self) -> None:
+        self.assertEqual(FONT_SCALES["中 / Medium"], 1.0)
+        self.assertLess(FONT_SCALES["小 / Small"], 1.0)
+        self.assertGreater(FONT_SCALES["大 / Large"], 1.0)
 
 
 if __name__ == "__main__":

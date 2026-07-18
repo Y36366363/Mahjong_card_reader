@@ -2,6 +2,10 @@
 
 ## Updates 7/18/2026
 
+- Fixed stale desktop hints that could name a tile no longer present in the player's hand. Hint state now carries a hand snapshot, is recalculated when the live hand differs, and is rejected by a final membership guard before display.
+- Kept the player's complete hand visible and full-color during every chi/pon/kan decision, with a permanent `当前手牌 / Your hand` heading so call choices can be evaluated without relying on memory.
+- Made opponent riichi and calls conspicuous: a new public action triggers a large temporary table banner and sound, while riichi player panels remain red-highlighted and open-hand panels remain gold-highlighted.
+- Added `小 / 中 / 大` desktop font sizing on the setup page. It scales table status, action controls, logs, hand tiles, and alert banners; tile widths adapt by size so a 14-tile hand and separated draw remain visible.
 - Improved the desktop play view after hands-on testing: the latest drawn tile remains separated at the far right, opponent concealed-tile counts are rendered as tile backs, and Chinese tiles display as `东南西北白发中` plus `万/筒/索` labels without changing internal tile IDs.
 - Added pre-discard riichi guidance. Every discard that leaves a legal closed tenpai is marked `可立直`; selecting it opens the existing explicit riichi yes/no confirmation.
 - Extended hint mode to call opportunities. Pon, chi, and kan prompts now show whether Advanced AI v1 recommends accepting or passing, without changing the player's final choice or contaminating AI statistics.
@@ -514,7 +518,7 @@ The simulator includes fixed walls after the initial shuffle, ron/tsumo settleme
 python desktop_ui.py
 ```
 
-设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式和可选复现种子。种子留空时会自动生成随机值，并在中央牌桌和牌局记录中显示，之后可以手动输入该值复现对局。牌局中直接点击手牌弃牌：本巡摸牌会与原手牌分开并固定显示在最右侧，其他三家的暗手会按真实张数显示为空白牌背。中文界面只在显示层把内部牌名转换为东南西北白发中和万/筒/索，计算逻辑与复现种子不受影响。
+设置页可以选择语言、Basic AI v1 或 Advanced AI v1 对手、温度、普通/提示模式、`小/中/大`字体和可选复现种子。种子留空时会自动生成随机值，并在中央牌桌和牌局记录中显示，之后可以手动输入该值复现对局。牌局中直接点击手牌弃牌：本巡摸牌会与原手牌分开并固定显示在最右侧，其他三家的暗手会按真实张数显示为空白牌背。中文界面只在显示层把内部牌名转换为东南西北白发中和万/筒/索，计算逻辑与复现种子不受影响。任何玩家立直时会显示红色事件横幅并持续用红色牌框标记；玩家副露时显示事件横幅，并持续用金色牌框标记。
 
 闭手达到听牌时，所有能够立直的弃牌会显示“可立直”；点击其中一张后，右侧会出现立直的是/否确认。通过右侧操作区还可以选择荣和/自摸、吃碰杠、跳过和结算后继续。提示模式会在出牌时显示推荐牌、向听和押引模式，并在吃、碰、大明杠机会出现时显示高级电脑建议接受或跳过。当前杠提示均为使用对手弃牌的“大明杠”；主动暗杠与加杠尚未加入。右侧牌局记录会保留完整计分、候选比较和记牌器信息。当前桌面版属于第一阶段兼容 UI，后续可以把输入桥接替换成正式事件接口，并加入应用打包、牌面美术、动画、音效和存档继续功能。
 
