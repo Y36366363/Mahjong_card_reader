@@ -2,6 +2,11 @@
 
 ## Updates 7/19/2026
 
+- Added real in-match ura-dora scoring. Each shuffled dead wall now fixes parallel visible-dora and ura-dora indicators; ura-dora is revealed and counted only after a riichi player actually wins, including the additional indicator pairs revealed by kans.
+- Split win handling into preview and final scoring. Ron/tsumo confirmation now shows the known yaku and visible/red dora but deliberately hides points; after acceptance, the engine reveals ura-dora, recalculates the final hand, and then displays yaku, dora, ura-dora, and points.
+- Expanded the central hand-settlement card after a win to identify who ron'd whom or who tsumo'd, show the complete final yaku/point result and ura indicators, and reveal all four concealed hands plus their open melds. Exhaustive draws retain the simpler score-change settlement.
+- Separated the four rinshan replacement tiles from the five dora/ura indicator pairs in the fixed dead wall, preventing a replacement draw from consuming an indicator tile.
+- Added dedicated tests for riichi-only ura-dora, fixed dora/ura kan pairs, point-free win confirmation, final ura scoring, winner/loser relationships, four-hand reveal data, and the rendered desktop win overlay. The complete suite now contains 56 passing tests.
 - Fixed the desktop `返回标题` action. It now safely unwinds the blocking game-input thread, ends the current match, and rebuilds the setup screen without closing the application. Closing the window remains a separate quit action.
 - Added a prominent central settlement card after every hand. It identifies ron, tsumo, or exhaustive draw; names winners and deal-in players; shows all four score changes; states dealer continuation/rotation; and retains explicit confirmation before the next hand.
 - Added a persistent final-match results card with ordered ranking, final points, wins, ron, tsumo, deal-ins, and riichi counts. The completed results remain visible until the player returns to the title screen.
@@ -594,7 +599,7 @@ python main.py --mode game --language zh
 
 - **碰**和**杠**使用“是/否”确认。
 - **吃**会列出所有合法组合，输入编号选择，输入 `0` 跳过。
-- 可以荣和或自摸时，程序会先显示检测到的役种与点数，再询问是否和牌。
+- 可以荣和或自摸时，程序会先显示检测到的役种，但不会提前显示点数。确认和牌后才翻开立直玩家的里宝牌、重新计算最终点数并进入中央结算。
 - 放弃一次可以荣和的牌会进入同巡振听，持续到自己的下一次摸牌。
 - 立直后见逃会在本局剩余时间内保持振听。
 - 当前所有和牌张中只要有一张出现在自己的牌河，就构成舍牌振听。振听只阻止荣和，不阻止自摸。
@@ -647,7 +652,7 @@ python benchmark_ai.py --games 24 --workers 4 --seed 800 \
 
 每个小局结束后会显示四家当前点数、本局点数变化，以及连庄或轮庄结果。交互模式会等待玩家确认后再进入下一局。整场结束后自动显示最终点数、排名，以及每家的小局数、和牌、荣和、自摸、放铳、立直、吃、碰、杠数据。
 
-桌面版会把每小局结算显示为牌桌中央的大型结算卡，明确标注荣和、自摸或流局、赢家、放铳者、四家点数变化和连庄/轮庄。点击“确认并进入下一局”后才会继续。东风战结束后，中央终局卡会持续显示最终排名、点数、和牌、荣和、自摸、放铳和立直次数，直到玩家主动返回标题。每家状态框还会持续显示相对当前庄家的自风；轮庄后东南西北会自动更新。
+桌面版会把每小局结算显示为牌桌中央的大型结算卡，明确标注荣和、自摸或流局、赢家、放铳者、四家点数变化和连庄/轮庄。有人和牌时还会展示最终役种、表宝牌/赤宝牌/里宝牌、最终点数、里宝牌指示牌，以及四家的完整暗手与副露；荣和会明确写出“谁和了谁”，自摸会明确标注自摸者。点击“确认并进入下一局”后才会继续。东风战结束后，中央终局卡会持续显示最终排名、点数、和牌、荣和、自摸、放铳和立直次数，直到玩家主动返回标题。每家状态框还会持续显示相对当前庄家的自风；轮庄后东南西北会自动更新。
 
 ### 8. 当前规则支持范围
 

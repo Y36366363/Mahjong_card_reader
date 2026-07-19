@@ -7,11 +7,81 @@ from io import StringIO
 from unittest.mock import patch
 
 from game import MahjongGame
+from scoring import score_points_from_config
 from shanten import shanten_standard, shanten_standard_draw_state
 from tiles import index_to_tile, tiles_to_counts
 
 
 class AdvancedAITests(unittest.TestCase):
+    def test_ura_dora_is_real_scoring_input_and_requires_riichi(self) -> None:
+        args = dict(
+            hand_text="1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P",
+            win_tile_text="P", win_type="ron", is_dealer=False,
+            seat_wind="S", round_wind="E", ura_dora_text="P",
+        )
+        riichi = score_points_from_config(**args, riichi=True)
+        dama = score_points_from_config(**args, riichi=False)
+        self.assertEqual(riichi.ura_dora_han, 2)
+        self.assertEqual(dama.ura_dora_han, 0)
+        self.assertGreater(riichi.han, dama.han)
+
+    def test_dead_wall_fixes_parallel_dora_ura_pairs_for_kans(self) -> None:
+        game = MahjongGame(seed=20260719)
+        game._new_wall()
+        self.assertEqual(len(game._rinshan_tiles), 4)
+        self.assertEqual(len(game._all_dora_indicators), 5)
+        self.assertEqual(len(game._all_ura_dora_indicators), 5)
+        self.assertEqual(game.dora_indicators, game._all_dora_indicators[:1])
+        self.assertEqual(game.ura_dora_indicators, game._all_ura_dora_indicators[:1])
+        game._reveal_kan_dora()
+        self.assertEqual(game.dora_indicators, game._all_dora_indicators[:2])
+        self.assertEqual(game.ura_dora_indicators, game._all_ura_dora_indicators[:2])
+
+    def test_win_confirmation_label_hides_points_until_final_score(self) -> None:
+        game = MahjongGame(language="zh")
+        game.players[0].hand = "1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P P".split()
+        game.players[0].riichi = True
+        game.dora_indicators = ["9m"]
+        game.ura_dora_indicators = ["C"]
+        score = game._try_score(0, "P", "tsumo", include_ura=True)
+        self.assertIsNotNone(score)
+        self.assertNotIn("点", game._yaku_label(score))
+        self.assertIn("里宝牌2", game._score_label(score))
+        self.assertIn("点", game._score_label(score))
+
+    def test_win_settlement_records_all_revealed_hands_and_relationship(self) -> None:
+        game = MahjongGame(language="zh")
+        game.players[1].hand = "1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P".split()
+        game.players[1].riichi = True
+        game.dora_indicators = ["9m"]
+        game.ura_dora_indicators = ["C"]
+        score = game._try_score(1, "P", "ron", include_ura=True)
+        self.assertIsNotNone(score)
+        before = [player.points for player in game.players]
+        game._settle_ron(0, [(1, score)])
+        game._show_hand_settlement(before, False)
+        settlement = game.last_hand_settlement
+        self.assertEqual(len(settlement["hands"]), 4)
+        self.assertEqual(settlement["wins"][0]["winner"], 1)
+        self.assertEqual(settlement["wins"][0]["loser"], 0)
+        self.assertEqual(settlement["wins"][0]["ura_indicators"], ["C"])
+
+    def test_ron_confirmation_shows_yaku_but_not_points(self) -> None:
+        game = MahjongGame(interactive=True, language="zh")
+        game.players[0].hand = "1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P".split()
+        game.players[0].riichi = True
+        prompts: list[str] = []
+
+        def decline(prompt: str) -> str:
+            prompts.append(prompt)
+            return "否"
+
+        with redirect_stdout(StringIO()), patch("builtins.input", side_effect=decline):
+            self.assertIsNone(game._resolve_ron(1, "P"))
+        self.assertTrue(prompts)
+        self.assertIn("役种", prompts[0])
+        self.assertNotIn("点", prompts[0])
+
     def test_ai_levels_are_explicit_and_validated(self) -> None:
         game = MahjongGame(ai_levels=["simple", "advanced", "simple", "advanced"])
         self.assertEqual([p.ai_level for p in game.players], ["simple", "advanced", "simple", "advanced"])

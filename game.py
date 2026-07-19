@@ -203,6 +203,10 @@ class MahjongGame:
         self.wall: list[str] = []
         self.dead_wall: list[str] = []
         self.dora_indicators: list[str] = []
+        self.ura_dora_indicators: list[str] = []
+        self._all_dora_indicators: list[str] = []
+        self._all_ura_dora_indicators: list[str] = []
+        self._rinshan_tiles: list[str] = []
         self._call_win_dealer_continues: bool | None = None
         self._hand_threat_modes: list[set[str]] = [set() for _ in range(4)]
         self._hand_outcomes: list[str | None] = [None] * 4
@@ -215,6 +219,7 @@ class MahjongGame:
         self.last_riichi_candidates: list[str] = []
         self.last_hand_settlement: dict[str, object] | None = None
         self.final_summary: dict[str, object] | None = None
+        self._last_win_details: list[dict[str, object]] = []
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -400,7 +405,20 @@ class MahjongGame:
         self.rng.shuffle(tiles)
         self.dead_wall = tiles[-14:]
         self.wall = tiles[:-14]
-        self.dora_indicators = [self.dead_wall[4]]
+        self._rinshan_tiles = self.dead_wall[:4].copy()
+        self._all_dora_indicators = self.dead_wall[4:14:2]
+        self._all_ura_dora_indicators = self.dead_wall[5:14:2]
+        self.dora_indicators = self._all_dora_indicators[:1]
+        self.ura_dora_indicators = self._all_ura_dora_indicators[:1]
+
+    def _reveal_kan_dora(self) -> None:
+        """Reveal the next fixed dora/ura pair after a kan."""
+        indicator_index = len(self.dora_indicators)
+        if indicator_index < len(self._all_dora_indicators):
+            self.dora_indicators.append(self._all_dora_indicators[indicator_index])
+            self.ura_dora_indicators = self._all_ura_dora_indicators[
+                :len(self.dora_indicators)
+            ]
 
     def _play_hand(self) -> bool:
         before = [p.points for p in self.players]
@@ -424,6 +442,7 @@ class MahjongGame:
         self._call_win_dealer_continues = None
         self._hand_threat_modes = [set() for _ in range(4)]
         self._hand_outcomes = [None] * 4
+        self._last_win_details = []
         for p in self.players:
             p.hand.clear(); p.melds.clear(); p.river.clear(); p.riichi = False
             p.temporary_furiten = False; p.riichi_furiten = False
@@ -454,10 +473,11 @@ class MahjongGame:
             p.last_drawn_tile = draw
             score = self._try_score(turn, draw, "tsumo")
             if score and (turn != 0 or self._yes_no(self._t(
-                f"Tsumo {draw} for {self._score_label(score)}?",
-                f"是否自摸 {draw}（{self._score_label(score)}）？",
+                f"Tsumo {draw}? Yaku: {self._yaku_label(score)}",
+                f"是否自摸 {draw}？役种：{self._yaku_label(score)}",
             ), True)):
-                self._settle_tsumo(turn, score)
+                final_score = self._try_score(turn, draw, "tsumo", include_ura=True) or score
+                self._settle_tsumo(turn, final_score)
                 return turn == self.dealer
             if turn == 0 and self.interactive:
                 self._show_state(draw)
@@ -516,6 +536,18 @@ class MahjongGame:
             "deltas": [player.points - before[i] for i, player in enumerate(self.players)],
             "dealer_continues": dealer_continues,
             "match_ends": match_ends,
+            "hands": [
+                {
+                    "seat": seat, "name": self._name(player),
+                    "hand": player.hand.copy(),
+                    "melds": [
+                        {"kind": meld.kind, "tiles": meld.tiles.copy()} for meld in player.melds
+                    ],
+                    "riichi": player.riichi,
+                }
+                for seat, player in enumerate(self.players)
+            ],
+            "wins": [detail.copy() for detail in self._last_win_details],
         }
         print(self._t("\nHand settlement", "\n本局结算"))
         for i, p in enumerate(self.players):
@@ -538,7 +570,9 @@ class MahjongGame:
     def _standard_shanten(self, p: PlayerState, extra: str | None = None) -> int:
         return shanten_standard(tiles_to_counts(self._full_for_analysis(p, extra)))
 
-    def _score_args(self, seat: int, win_tile: str, win_type: str) -> dict[str, object]:
+    def _score_args(
+        self, seat: int, win_tile: str, win_type: str, *, include_ura: bool = False
+    ) -> dict[str, object]:
         p = self.players[seat]
         concealed = p.hand.copy()
         # Ron tile is not in hand; a tsumo tile already is and must be removed once.
@@ -552,9 +586,14 @@ class MahjongGame:
         for m in open_melds:
             ordered.extend(m.tiles)
         dora = " ".join(dora_from_indicator(x) for x in self.dora_indicators)
+        ura_dora = " ".join(
+            dora_from_indicator(x)
+            for x in self.ura_dora_indicators[:len(self.dora_indicators)]
+        ) if include_ura and p.riichi else ""
         return dict(
             hand_text=" ".join(ordered), win_tile_text=win_tile, win_type=win_type,
             is_dealer=seat == self.dealer, dora_text=dora,
+            ura_dora_text=ura_dora,
             seat_wind=WINDS[(seat - self.dealer) % 4], round_wind="E",
             riichi=p.riichi, furo_sets=len(open_melds),
             kan_sets=sum(m.kind == "kan" for m in open_melds),
@@ -562,9 +601,13 @@ class MahjongGame:
             kan_tiles=[m.tiles[0] for m in open_melds if m.kind == "kan"],
         )
 
-    def _try_score(self, seat: int, tile: str, win_type: str) -> ScoreBreakdown | None:
+    def _try_score(
+        self, seat: int, tile: str, win_type: str, *, include_ura: bool = False
+    ) -> ScoreBreakdown | None:
         try:
-            return score_points_from_config(**self._score_args(seat, tile, win_type))
+            return score_points_from_config(
+                **self._score_args(seat, tile, win_type, include_ura=include_ura)
+            )
         except (ValueError, IndexError):
             return None
 
@@ -599,12 +642,13 @@ class MahjongGame:
                 continue
             accepted = other != 0 or self._yes_no(
                 self._t(
-                    f"Ron on {discard} for {self._score_label(score)}?",
-                    f"是否荣和 {discard}（{self._score_label(score)}）？",
+                    f"Ron on {discard}? Yaku: {self._yaku_label(score)}",
+                    f"是否荣和 {discard}？役种：{self._yaku_label(score)}",
                 ), True
             )
             if accepted:
-                winners.append((other, score))
+                final_score = self._try_score(other, discard, "ron", include_ura=True) or score
+                winners.append((other, final_score))
             else:
                 missed = self.players[other]
                 if missed.riichi:
@@ -1176,14 +1220,12 @@ class MahjongGame:
                     # Daiminkan receives a replacement tile from the dead wall and
                     # reveals another dora indicator. The live wall is shortened by
                     # one so the total number of drawable tiles stays correct.
-                    replacement = self.dead_wall.pop()
+                    replacement = self._rinshan_tiles.pop(0)
                     p.hand.append(replacement); p.sort()
                     p.last_drawn_tile = replacement
                     if self.wall:
                         self.wall.pop()
-                    indicator_pos = 4 + 2 * len(self.dora_indicators)
-                    if indicator_pos < len(self.dead_wall):
-                        self.dora_indicators.append(self.dead_wall[indicator_pos])
+                    self._reveal_kan_dora()
                     doras = " ".join(dora_from_indicator(x) for x in self.dora_indicators)
                     print(self._t(
                         f"{self._name(p)} draws a replacement tile; dora is now {doras}.",
@@ -1193,13 +1235,16 @@ class MahjongGame:
                     accepts = rinshan_score and (
                         caller != 0 or self._yes_no(
                             self._t(
-                                f"Tsumo after kan for {self._score_label(rinshan_score)}?",
-                                f"杠后是否自摸（{self._score_label(rinshan_score)}）？",
+                                f"Tsumo after kan? Yaku: {self._yaku_label(rinshan_score)}",
+                                f"杠后是否自摸？役种：{self._yaku_label(rinshan_score)}",
                             ), True
                         )
                     )
                     if rinshan_score and accepts:
-                        self._settle_tsumo(caller, rinshan_score)
+                        final_score = self._try_score(
+                            caller, replacement, "tsumo", include_ura=True
+                        ) or rinshan_score
+                        self._settle_tsumo(caller, final_score)
                         self._call_win_dealer_continues = caller == self.dealer
                         return None
                 if caller == 0 and self.interactive:
@@ -1514,7 +1559,7 @@ class MahjongGame:
                 and self._shanten_after_discard(p, tile) == 0
             ]
 
-    def _score_label(self, sb: ScoreBreakdown) -> str:
+    def _score_names(self, sb: ScoreBreakdown) -> list[str]:
         names = [x.name for x in sb.yakuman] or [x.name for x in sb.yaku]
         if self.language in {"zh", "ja"}:
             translations_zh = {
@@ -1535,6 +1580,27 @@ class MahjongGame:
             }
             translations = translations_zh if self.language == "zh" else translations_ja
             names = [translations.get(name, name) for name in names]
+        return names
+
+    def _yaku_label(self, sb: ScoreBreakdown) -> str:
+        """Show known yaku before acceptance without leaking the final points."""
+        names = self._score_names(sb)
+        bonuses: list[str] = []
+        if sb.dora_han:
+            bonuses.append(self._t(f"Dora {sb.dora_han}", f"宝牌{sb.dora_han}", f"ドラ{sb.dora_han}"))
+        if sb.aka_dora_han:
+            bonuses.append(self._t(f"Red dora {sb.aka_dora_han}", f"赤宝牌{sb.aka_dora_han}", f"赤ドラ{sb.aka_dora_han}"))
+        separator = "、" if self.language == "zh" else "・" if self.language == "ja" else ", "
+        return separator.join(names + bonuses)
+
+    def _score_label(self, sb: ScoreBreakdown) -> str:
+        names = self._score_names(sb)
+        if sb.dora_han:
+            names.append(self._t(f"Dora {sb.dora_han}", f"宝牌{sb.dora_han}", f"ドラ{sb.dora_han}"))
+        if sb.aka_dora_han:
+            names.append(self._t(f"Red dora {sb.aka_dora_han}", f"赤宝牌{sb.aka_dora_han}", f"赤ドラ{sb.aka_dora_han}"))
+        if sb.ura_dora_han:
+            names.append(self._t(f"Ura-dora {sb.ura_dora_han}", f"里宝牌{sb.ura_dora_han}", f"裏ドラ{sb.ura_dora_han}"))
         pts = sb.points.ron_points or sb.points.tsumo_total_points
         return self._t(
             f"{', '.join(names)}; {pts} points",
@@ -1559,6 +1625,13 @@ class MahjongGame:
             if self.players[winner].melds:
                 self.players[winner].stats.open_hand_wins += 1
                 self.players[winner].stats.open_hand_win_points += amount
+            self._last_win_details.append({
+                "winner": winner, "loser": loser, "win_type": "ron",
+                "win_tile": sb.win_tile,
+                "score_label": self._score_label(sb), "points": amount,
+                "ura_indicators": self.ura_dora_indicators[:len(self.dora_indicators)]
+                if self.players[winner].riichi else [],
+            })
             print(self._t(
                 f"{self._name(self.players[winner])} ron: {self._score_label(sb)} from {self._name(self.players[loser])}.",
                 f"{self._name(self.players[winner])}荣和：{self._score_label(sb)}，放铳者为{self._name(self.players[loser])}。",
@@ -1590,6 +1663,13 @@ class MahjongGame:
         if self.players[winner].melds:
             self.players[winner].stats.open_hand_wins += 1
             self.players[winner].stats.open_hand_win_points += win_amount
+        self._last_win_details.append({
+            "winner": winner, "loser": None, "win_type": "tsumo",
+            "win_tile": sb.win_tile,
+            "score_label": self._score_label(sb), "points": win_amount,
+            "ura_indicators": self.ura_dora_indicators[:len(self.dora_indicators)]
+            if self.players[winner].riichi else [],
+        })
         print(self._t(
             f"{self._name(self.players[winner])} tsumo: {self._score_label(sb)}.",
             f"{self._name(self.players[winner])}自摸：{self._score_label(sb)}。",

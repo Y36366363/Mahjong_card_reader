@@ -599,7 +599,7 @@ class MahjongDesktopApp:
 
     def _show_summary(
         self, title: str, lines: list[str], *, final: bool = False,
-        continue_text: str = "确认并进入下一局 / Continue",
+        continue_text: str = "确认并进入下一局 / Continue", wide: bool = False,
     ) -> None:
         self._clear_summary()
         tk.Label(
@@ -608,7 +608,8 @@ class MahjongDesktopApp:
         ).pack(pady=(0, 12))
         tk.Label(
             self.summary_frame, text="\n".join(lines), justify="left",
-            bg="#fff8df", fg=COLORS["ink"], font=self._font(12),
+            bg="#fff8df", fg=COLORS["ink"], font=self._font(11),
+            wraplength=820 if wide else 650,
         ).pack(fill="x")
         command = self._return_to_title if final else self._continue_after_settlement
         ttk.Button(
@@ -616,7 +617,9 @@ class MahjongDesktopApp:
             text="返回标题 / Title" if final else continue_text,
             command=command,
         ).pack(fill="x", pady=(16, 0))
-        self.summary_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.58)
+        self.summary_frame.place(
+            relx=0.5, rely=0.5, anchor="center", relwidth=0.82 if wide else 0.62
+        )
         self.summary_frame.lift()
 
     def _show_new_settlement(self) -> None:
@@ -635,17 +638,57 @@ class MahjongDesktopApp:
             headline = f"{'、'.join(winners)} 自摸"
         else:
             headline = "流局 / Exhaustive draw"
-        lines = [headline, ""]
+        lines = [headline]
+        for win in settlement.get("wins", []):
+            winner_name = self.game._name(self.game.players[int(win["winner"])])
+            if win["win_type"] == "ron":
+                loser_name = self.game._name(self.game.players[int(win["loser"])])
+                lines.append(f"{winner_name} 荣和 {loser_name}：{win['score_label']}")
+            else:
+                lines.append(f"{winner_name} 自摸：{win['score_label']}")
+            if win.get("ura_indicators"):
+                indicators = " ".join(
+                    display_tile(tile, self.game.language) for tile in win["ura_indicators"]
+                )
+                ura_tiles = " ".join(
+                    display_tile(dora_from_indicator(tile), self.game.language)
+                    for tile in win["ura_indicators"]
+                )
+                lines.append(f"里宝牌指示牌：{indicators}  →  里宝牌：{ura_tiles}")
+        lines.extend(("", "点数变化："))
         for seat, player in enumerate(self.game.players):
             delta = int(settlement["deltas"][seat])
             lines.append(f"{self.game._name(player):<6} {int(settlement['scores'][seat]):>6,}  ({delta:+,})")
+        if settlement.get("wins"):
+            lines.extend(("", "公开手牌："))
+            win_tiles = {
+                int(win["winner"]): str(win["win_tile"])
+                for win in settlement["wins"]
+            }
+            for hand_data in settlement.get("hands", []):
+                seat = int(hand_data["seat"])
+                tiles = " ".join(
+                    display_tile(tile, self.game.language) for tile in hand_data["hand"]
+                ) or "—"
+                melds = " / ".join(
+                    f"{self.game._meld_name(meld['kind'])} "
+                    + " ".join(display_tile(tile, self.game.language) for tile in meld["tiles"])
+                    for meld in hand_data["melds"]
+                )
+                winning = ""
+                if seat in win_tiles and settlement["win_type"] == "ron":
+                    winning = f"  ＋和牌 {display_tile(win_tiles[seat], self.game.language)}"
+                suffix = f"  |  副露 {melds}" if melds else ""
+                lines.append(f"{hand_data['name']}：{tiles}{winning}{suffix}")
         lines.extend(("", "庄家连庄" if settlement["dealer_continues"] else "庄家轮庄"))
         hand_number = int(settlement["round_hand"]) + 1
         button_text = (
             "确认并查看最终结果 / Final results"
             if settlement.get("match_ends") else "确认并进入下一局 / Continue"
         )
-        self._show_summary(f"东{hand_number}局 结算", lines, continue_text=button_text)
+        self._show_summary(
+            f"东{hand_number}局 结算", lines, continue_text=button_text, wide=True
+        )
 
     def _continue_after_settlement(self) -> None:
         self._clear_summary()

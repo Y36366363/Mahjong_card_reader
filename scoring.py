@@ -32,6 +32,7 @@ class ScoreBreakdown:
     fu: int | None
     dora_han: int
     aka_dora_han: int
+    ura_dora_han: int
     points: object
 
 
@@ -394,6 +395,7 @@ def score_points_from_config(
     win_type: str,
     is_dealer: bool,
     dora_text: str | None = None,
+    ura_dora_text: str | None = None,
     seat_wind: str = "E",
     round_wind: str = "E",
     riichi: bool = False,
@@ -410,6 +412,7 @@ def score_points_from_config(
       - win_tile_text: the winning tile (tsumo draw or ron tile)
       - win_type: "tsumo" or "ron"
       - dora_text: optional tiles that are dora (NOT indicators), space-separated
+      - ura_dora_text: optional ura-dora tiles; counted only when riichi is true
 
     Assumptions:
       - supports open melds (furo) and multiple kans via config
@@ -498,6 +501,10 @@ def score_points_from_config(
 
     aka_dora = _aka_dora_han(hand_raw, win_raw)
     dora_han = _dora_han(full_norm, dora_tiles_raw)
+    ura_dora_tiles_raw = (
+        parse_tiles(ura_dora_text, keep_red_fives=True) if ura_dora_text and riichi else []
+    )
+    ura_dora_han = _dora_han(full_norm, ura_dora_tiles_raw)
 
     yakuman: list[Yakuman] = []
     yaku: list[Yaku] = []
@@ -526,6 +533,7 @@ def score_points_from_config(
             fu=None,
             dora_han=0,
             aka_dora_han=0,
+            ura_dora_han=0,
             points=pts,
         )
 
@@ -536,10 +544,10 @@ def score_points_from_config(
             yaku.append(Yaku("Riichi", 1))
         if win_type == "tsumo" and is_closed:
             yaku.append(Yaku("Menzen Tsumo", 1))
-        han = sum(y.han_closed for y in yaku) + dora_han + aka_dora
+        han = sum(y.han_closed for y in yaku) + dora_han + aka_dora + ura_dora_han
         fu = 25
         if not yaku:
-            raise ValueError("Winning hand has no yaku (dora/aka-dora do not count as yaku).")
+            raise ValueError("Winning hand has no yaku (dora/aka-dora/ura-dora do not count as yaku).")
         pts = estimate_points(han=han, fu=fu, is_dealer=is_dealer, win_type=win_type)
         return ScoreBreakdown(
             win_type=win_type,
@@ -553,6 +561,7 @@ def score_points_from_config(
             fu=fu,
             dora_han=dora_han,
             aka_dora_han=aka_dora,
+            ura_dora_han=ura_dora_han,
             points=pts,
         )
 
@@ -598,6 +607,7 @@ def score_points_from_config(
                 fu=None,
                 dora_han=0,
                 aka_dora_han=0,
+                ura_dora_han=0,
                 points=pts,
             )
         else:
@@ -635,9 +645,9 @@ def score_points_from_config(
                 yaku.append(Yaku("Pinfu", 1))
 
             if not yaku:
-                raise ValueError("Winning hand has no yaku (dora/aka-dora do not count as yaku).")
+                raise ValueError("Winning hand has no yaku (dora/aka-dora/ura-dora do not count as yaku).")
 
-            han = sum(y.han_closed for y in yaku) + dora_han + aka_dora
+            han = sum(y.han_closed for y in yaku) + dora_han + aka_dora + ura_dora_han
             fu = _fu_standard(
                 decomp,
                 win_type=win_type,
@@ -660,6 +670,7 @@ def score_points_from_config(
                 fu=fu,
                 dora_han=dora_han,
                 aka_dora_han=aka_dora,
+                ura_dora_han=ura_dora_han,
                 points=pts,
             )
 
@@ -679,4 +690,3 @@ def score_points_from_config(
 
     assert best is not None
     return best
-
