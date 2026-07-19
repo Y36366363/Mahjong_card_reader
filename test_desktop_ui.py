@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 from desktop_ui import (
     FONT_SCALES,
+    GameAborted,
+    MahjongDesktopApp,
     PROFILE_DISPLAY_TO_ID,
     TABLE_POSITIONS,
     QueueWriter,
@@ -15,6 +17,7 @@ from desktop_ui import (
     display_text,
     display_tile,
     resolve_desktop_seed,
+    seat_wind,
     valid_hint_tile,
 )
 
@@ -74,6 +77,19 @@ class DesktopUIAdapterTests(unittest.TestCase):
         self.assertEqual(FONT_SCALES["中 / Medium"], 1.0)
         self.assertLess(FONT_SCALES["小 / Small"], 1.0)
         self.assertGreater(FONT_SCALES["大 / Large"], 1.0)
+
+    def test_seat_winds_rotate_with_the_dealer(self) -> None:
+        self.assertEqual([seat_wind(seat, 0) for seat in range(4)], ["E", "S", "W", "N"])
+        self.assertEqual([seat_wind(seat, 2) for seat in range(4)], ["W", "N", "E", "S"])
+
+    def test_return_to_title_can_unwind_a_blocking_input(self) -> None:
+        app = MahjongDesktopApp.__new__(MahjongDesktopApp)
+        app.events = queue.Queue()
+        app.responses = queue.Queue()
+        app.abort_requested = True
+        app.responses.put("")
+        with self.assertRaises(GameAborted):
+            app._gui_input("Discard tile: ")
 
 
 if __name__ == "__main__":

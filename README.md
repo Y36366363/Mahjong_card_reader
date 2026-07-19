@@ -1,5 +1,14 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/19/2026
+
+- Fixed the desktop `返回标题` action. It now safely unwinds the blocking game-input thread, ends the current match, and rebuilds the setup screen without closing the application. Closing the window remains a separate quit action.
+- Added a prominent central settlement card after every hand. It identifies ron, tsumo, or exhaustive draw; names winners and deal-in players; shows all four score changes; states dealer continuation/rotation; and retains explicit confirmation before the next hand.
+- Added a persistent final-match results card with ordered ranking, final points, wins, ron, tsumo, deal-ins, and riichi counts. The completed results remain visible until the player returns to the title screen.
+- Added live seat-wind labels to all four player panels. Each panel prominently shows East/South/West/North relative to the current dealer and updates automatically after dealer rotation.
+- Added structured hand-settlement and final-summary data to the game engine so the desktop UI does not need to parse human-readable log text.
+- Verified 51 automated tests, hidden GUI checks for return-to-title and both result overlays, and complete fixed-seed Advanced AI v1 hint matches with active call decisions.
+
 ## Updates 7/18/2026
 
 - Fixed stale desktop hints that could name a tile no longer present in the player's hand. Hint state now carries a hand snapshot, is recalculated when the live hand differs, and is rejected by a final membership guard before display.
@@ -637,6 +646,8 @@ python benchmark_ai.py --games 24 --workers 4 --seed 800 \
 ### 7. 小局结算与最终统计
 
 每个小局结束后会显示四家当前点数、本局点数变化，以及连庄或轮庄结果。交互模式会等待玩家确认后再进入下一局。整场结束后自动显示最终点数、排名，以及每家的小局数、和牌、荣和、自摸、放铳、立直、吃、碰、杠数据。
+
+桌面版会把每小局结算显示为牌桌中央的大型结算卡，明确标注荣和、自摸或流局、赢家、放铳者、四家点数变化和连庄/轮庄。点击“确认并进入下一局”后才会继续。东风战结束后，中央终局卡会持续显示最终排名、点数、和牌、荣和、自摸、放铳和立直次数，直到玩家主动返回标题。每家状态框还会持续显示相对当前庄家的自风；轮庄后东南西北会自动更新。
 
 ### 8. 当前规则支持范围
 

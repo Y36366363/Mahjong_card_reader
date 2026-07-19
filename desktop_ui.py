@@ -11,7 +11,7 @@ from contextlib import redirect_stdout
 from tkinter import messagebox, ttk
 from unittest.mock import patch
 
-from game import AI_PROFILES, MahjongGame, dora_from_indicator
+from game import AI_PROFILES, WINDS, MahjongGame, dora_from_indicator
 
 
 COLORS = {
@@ -30,6 +30,15 @@ PROFILE_DISPLAY_TO_ID = {
     profile.display_name: profile_id for profile_id, profile in AI_PROFILES.items()
 }
 FONT_SCALES = {"小 / Small": 0.85, "中 / Medium": 1.0, "大 / Large": 1.25}
+WIND_NAMES = {
+    "zh": {"E": "东", "S": "南", "W": "西", "N": "北"},
+    "en": {"E": "East", "S": "South", "W": "West", "N": "North"},
+    "ja": {"E": "東", "S": "南", "W": "西", "N": "北"},
+}
+
+
+class GameAborted(Exception):
+    """Internal signal used to safely unwind the blocking game input loop."""
 
 ZH_HONORS = {"E": "东", "S": "南", "W": "西", "N": "北", "P": "白", "F": "发", "C": "中"}
 
@@ -80,6 +89,10 @@ def valid_hint_tile(hand: list[str], recommendation: str | None) -> str | None:
     return recommendation if recommendation in hand else None
 
 
+def seat_wind(seat: int, dealer: int) -> str:
+    return WINDS[(seat - dealer) % 4]
+
+
 def classify_prompt(prompt: str) -> str:
     text = prompt.lower()
     if any(word in text for word in ("discard tile", "要打出的牌", "捨てる牌")):
@@ -123,11 +136,14 @@ class MahjongDesktopApp:
         self._last_hand: tuple[str, ...] = ()
         self._public_states: list[tuple[bool, int]] | None = None
         self._notice_after_id: str | None = None
+        self._seen_settlement: object | None = None
+        self.abort_requested = False
+        self.match_complete = False
         self.ui_scale = 1.0
         self._configure_style()
         self._build_setup()
         self.root.after(80, self._poll)
-        self.root.protocol("WM_DELETE_WINDOW", self._close)
+        self.root.protocol("WM_DELETE_WINDOW", self._quit)
 
     def _configure_style(self) -> None:
         style = ttk.Style()
@@ -269,6 +285,10 @@ class MahjongDesktopApp:
             left, text="", bg="#b52f2a", fg="white", font=self._font(18, "bold"),
             padx=18, pady=10, relief="raised", bd=4,
         )
+        self.summary_frame = tk.Frame(
+            left, bg="#fff8df", padx=24, pady=20, relief="raised", bd=5,
+            highlightbackground=COLORS["accent"], highlightthickness=3,
+        )
 
         bottom = tk.Frame(left, bg=COLORS["table"])
         bottom.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
@@ -307,7 +327,7 @@ class MahjongDesktopApp:
         )
         self.log.grid(row=4, column=0, sticky="nsew")
         right.grid_rowconfigure(4, weight=1)
-        ttk.Button(right, text="返回标题（结束当前局）", command=self._close).grid(
+        ttk.Button(right, text="返回标题（结束当前局）", command=self._return_to_title).grid(
             row=5, column=0, sticky="ew", pady=(9, 0)
         )
 
@@ -330,24 +350,36 @@ class MahjongDesktopApp:
             language=self.language_var.get(),
         )
         self.active_seed = seed
+        self.abort_requested = False
+        self.match_complete = False
+        self._seen_settlement = None
+        self._public_states = None
         self._append_log(f"Replay seed / 复现种子: {seed}\n")
         self.running = True
         threading.Thread(target=self._run_game, daemon=True).start()
 
     def _run_game(self) -> None:
         writer = QueueWriter(self.events)
+        result = "done"
         try:
             with redirect_stdout(writer), patch("builtins.input", self._gui_input):
                 assert self.game is not None
                 self.game.play()
+                if self.abort_requested:
+                    result = "aborted"
+        except GameAborted:
+            result = "aborted"
         except Exception as exc:  # keep a desktop crash visible and actionable
             self.events.put(("error", repr(exc)))
         finally:
-            self.events.put(("done", None))
+            self.events.put((result, None))
 
     def _gui_input(self, prompt: str = "") -> str:
         self.events.put(("prompt", prompt))
-        return self.responses.get()
+        response = self.responses.get()
+        if self.abort_requested:
+            raise GameAborted
+        return response
 
     def _poll(self) -> None:
         try:
@@ -361,13 +393,19 @@ class MahjongDesktopApp:
                     messagebox.showerror("Game error", str(payload))
                 elif kind == "done":
                     self.running = False
+                    self.match_complete = True
                     self.pending_kind = None
                     self.prompt_label.config(text="牌局结束 / Match complete")
                     self._clear_actions()
-                    ttk.Button(self.action_frame, text="关闭游戏", command=self._close).pack(fill="x")
+                    ttk.Button(self.action_frame, text="返回标题", command=self._return_to_title).pack(fill="x")
+                    self._show_final_summary()
+                elif kind == "aborted":
+                    self.running = False
+                    self._reset_to_title()
         except queue.Empty:
             pass
         self._refresh_table()
+        self._show_new_settlement()
         self.root.after(80, self._poll)
 
     def _show_prompt(self, prompt: str) -> None:
@@ -450,11 +488,14 @@ class MahjongDesktopApp:
     def _respond(self, value: str) -> None:
         if self.pending_kind is None:
             return
+        was_continue = self.pending_kind == "continue"
         self.pending_kind = None
         self.recommended_tile = None
         self.responses.put(value)
         self.prompt_label.config(text="电脑行动中…")
         self._clear_actions()
+        if was_continue:
+            self._clear_summary()
         self._render_hand(force=True)
 
     def _clear_actions(self) -> None:
@@ -488,6 +529,9 @@ class MahjongDesktopApp:
             self._public_states = current_states
             for seat, player in enumerate(game.players):
                 status = []
+                wind = seat_wind(seat, game.dealer)
+                wind_name = WIND_NAMES[game.language][wind]
+                wind_prefix = {"zh": "自风", "en": "Seat wind", "ja": "自風"}[game.language]
                 if seat == game.dealer:
                     status.append("庄 / Dealer")
                 if player.riichi:
@@ -507,7 +551,8 @@ class MahjongDesktopApp:
                     bd=4 if player.riichi else 3 if player.melds else 2,
                     text=(
                         f"{game._name(player)}  {player.points:,}\n"
-                        f"{' · '.join(status) if status else ' '}\n"
+                        f"【{wind_prefix} {wind_name} ({wind})】  "
+                        f"{' · '.join(status) if status else ''}\n"
                         f"{melds}{concealed}\n河: {river}"
                     )
                 )
@@ -545,6 +590,80 @@ class MahjongDesktopApp:
         self.notice_label.place_forget()
         self._notice_after_id = None
 
+    def _clear_summary(self) -> None:
+        if not hasattr(self, "summary_frame"):
+            return
+        self.summary_frame.place_forget()
+        for child in self.summary_frame.winfo_children():
+            child.destroy()
+
+    def _show_summary(
+        self, title: str, lines: list[str], *, final: bool = False,
+        continue_text: str = "确认并进入下一局 / Continue",
+    ) -> None:
+        self._clear_summary()
+        tk.Label(
+            self.summary_frame, text=title, bg="#fff8df", fg=COLORS["ink"],
+            font=self._font(20, "bold"),
+        ).pack(pady=(0, 12))
+        tk.Label(
+            self.summary_frame, text="\n".join(lines), justify="left",
+            bg="#fff8df", fg=COLORS["ink"], font=self._font(12),
+        ).pack(fill="x")
+        command = self._return_to_title if final else self._continue_after_settlement
+        ttk.Button(
+            self.summary_frame,
+            text="返回标题 / Title" if final else continue_text,
+            command=command,
+        ).pack(fill="x", pady=(16, 0))
+        self.summary_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.58)
+        self.summary_frame.lift()
+
+    def _show_new_settlement(self) -> None:
+        if self.match_complete or self.game is None or not hasattr(self, "summary_frame"):
+            return
+        settlement = self.game.last_hand_settlement
+        if settlement is None or settlement is self._seen_settlement:
+            return
+        self._seen_settlement = settlement
+        winners = [self.game._name(self.game.players[i]) for i in settlement["winners"]]
+        losers = [self.game._name(self.game.players[i]) for i in settlement["losers"]]
+        result = str(settlement["win_type"])
+        if result == "ron":
+            headline = f"{'、'.join(winners)} 荣和 · {'、'.join(losers)} 放铳"
+        elif result == "tsumo":
+            headline = f"{'、'.join(winners)} 自摸"
+        else:
+            headline = "流局 / Exhaustive draw"
+        lines = [headline, ""]
+        for seat, player in enumerate(self.game.players):
+            delta = int(settlement["deltas"][seat])
+            lines.append(f"{self.game._name(player):<6} {int(settlement['scores'][seat]):>6,}  ({delta:+,})")
+        lines.extend(("", "庄家连庄" if settlement["dealer_continues"] else "庄家轮庄"))
+        hand_number = int(settlement["round_hand"]) + 1
+        button_text = (
+            "确认并查看最终结果 / Final results"
+            if settlement.get("match_ends") else "确认并进入下一局 / Continue"
+        )
+        self._show_summary(f"东{hand_number}局 结算", lines, continue_text=button_text)
+
+    def _continue_after_settlement(self) -> None:
+        self._clear_summary()
+        if self.pending_kind == "continue":
+            self._respond("")
+
+    def _show_final_summary(self) -> None:
+        if self.game is None or self.game.final_summary is None:
+            return
+        lines: list[str] = []
+        for row in self.game.final_summary["ranking"]:
+            lines.append(
+                f"{row['rank']}位  {row['name']:<6} {row['points']:>6,}点  "
+                f"和牌{row['wins']}  荣和{row['ron']}  自摸{row['tsumo']}  "
+                f"放铳{row['deal_in']}  立直{row['riichi']}"
+            )
+        self._show_summary("东风战 最终排名", lines, final=True)
+
     def _render_hand(self, *, force: bool = False) -> None:
         if self.game is None or not hasattr(self, "hand_frame"):
             return
@@ -580,9 +699,43 @@ class MahjongDesktopApp:
             )
             button.pack(side="left", padx=(8 if is_drawn else 1, 1))
 
-    def _close(self) -> None:
+    def _return_to_title(self) -> None:
         if self.running:
-            self.responses.put("n")
+            self.abort_requested = True
+            self.responses.put("")
+            self.prompt_label.config(text="正在返回标题…")
+            self._clear_actions()
+            return
+        self._reset_to_title()
+
+    def _reset_to_title(self) -> None:
+        settings = {
+            "language": self.language_var.get(), "profile": self.profile_var.get(),
+            "temperature": self.temperature_var.get(), "assist": self.assist_var.get(),
+            "font_size": self.font_size_var.get(), "seed": self.seed_var.get(),
+        }
+        if hasattr(self, "screen") and self.screen.winfo_exists():
+            self.screen.destroy()
+        self.game = None
+        self.pending_kind = None
+        self.recommended_tile = None
+        self._public_states = None
+        self._last_hand = ()
+        self.match_complete = False
+        self.abort_requested = False
+        self.responses = queue.Queue()
+        self._build_setup()
+        self.language_var.set(settings["language"])
+        self.profile_var.set(settings["profile"])
+        self.temperature_var.set(settings["temperature"])
+        self.assist_var.set(settings["assist"])
+        self.font_size_var.set(settings["font_size"])
+        self.seed_var.set(settings["seed"])
+
+    def _quit(self) -> None:
+        if self.running:
+            self.abort_requested = True
+            self.responses.put("")
         self.root.destroy()
 
 

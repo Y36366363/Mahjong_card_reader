@@ -203,6 +203,13 @@ class AdvancedAITests(unittest.TestCase):
             game.play()
         self.assertTrue(all(player.stats.hands >= 4 for player in game.players))
         self.assertEqual(sum(player.points for player in game.players), 100_000)
+        self.assertIsNotNone(game.last_hand_settlement)
+        self.assertIn(game.last_hand_settlement["win_type"], {"ron", "tsumo", "draw"})
+        self.assertEqual(len(game.last_hand_settlement["scores"]), 4)
+        self.assertIsNotNone(game.final_summary)
+        ranking = game.final_summary["ranking"]
+        self.assertEqual([row["rank"] for row in ranking], [1, 2, 3, 4])
+        self.assertEqual(sum(row["points"] for row in ranking), 100_000)
 
 
 if __name__ == "__main__":

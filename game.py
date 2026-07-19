@@ -213,6 +213,8 @@ class MahjongGame:
         self.last_call_recommendation: str | None = None
         self.last_call_report: dict[str, object] | None = None
         self.last_riichi_candidates: list[str] = []
+        self.last_hand_settlement: dict[str, object] | None = None
+        self.final_summary: dict[str, object] | None = None
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -368,6 +370,18 @@ class MahjongGame:
                 f"  {self._name(p):<7} {s.hands:>5} {s.wins:>4} {s.ron:>3} {s.tsumo:>5} "
                 f"{s.deal_in:>7} {s.riichi:>6} {s.chi:>3} {s.pon:>3} {s.kan:>3}"
             )
+        self.final_summary = {
+            "ranking": [
+                {
+                    "rank": rank, "seat": seat, "name": self._name(player),
+                    "points": player.points, "hands": player.stats.hands,
+                    "wins": player.stats.wins, "ron": player.stats.ron,
+                    "tsumo": player.stats.tsumo, "deal_in": player.stats.deal_in,
+                    "riichi": player.stats.riichi,
+                }
+                for rank, (seat, player) in enumerate(ranked, 1)
+            ]
+        }
 
     def _choose_assist_mode(self) -> str:
         print(self._t("Select play mode:", "选择游戏模式："))
@@ -394,12 +408,15 @@ class MahjongGame:
             p.stats.hands += 1
         dealer_continues = self._play_hand_core()
         self._finalize_ai_hand_metrics()
-        self._show_hand_settlement(before, dealer_continues)
         match_ends = any(p.points <= 0 for p in self.players) or (
             self.round_hand == 3 and not dealer_continues
         )
-        if self.interactive and not match_ends:
-            input(self._t("Press Enter to continue to the next hand...", "按回车进入下一局……"))
+        self._show_hand_settlement(before, dealer_continues, match_ends=match_ends)
+        if self.interactive:
+            input(self._t(
+                "Press Enter to view final results..." if match_ends else "Press Enter to continue to the next hand...",
+                "按回车查看最终结果……" if match_ends else "按回车进入下一局……",
+            ))
         return dealer_continues
 
     def _play_hand_core(self) -> bool:
@@ -482,7 +499,24 @@ class MahjongGame:
         dealer_tenpai = self.dealer in tenpai
         return dealer_tenpai
 
-    def _show_hand_settlement(self, before: list[int], dealer_continues: bool) -> None:
+    def _show_hand_settlement(
+        self, before: list[int], dealer_continues: bool, *, match_ends: bool = False
+    ) -> None:
+        winners = [i for i, outcome in enumerate(self._hand_outcomes) if outcome == "win"]
+        losers = [i for i, outcome in enumerate(self._hand_outcomes) if outcome == "deal_in"]
+        win_type = "ron" if losers else "tsumo" if winners else "draw"
+        self.last_hand_settlement = {
+            "round_hand": self.round_hand,
+            "honba": self.honba,
+            "dealer": self.dealer,
+            "win_type": win_type,
+            "winners": winners,
+            "losers": losers,
+            "scores": [player.points for player in self.players],
+            "deltas": [player.points - before[i] for i, player in enumerate(self.players)],
+            "dealer_continues": dealer_continues,
+            "match_ends": match_ends,
+        }
         print(self._t("\nHand settlement", "\n本局结算"))
         for i, p in enumerate(self.players):
             delta = p.points - before[i]
