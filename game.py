@@ -142,7 +142,7 @@ class PlayerState:
 
 
 class MahjongGame:
-    """Small, deterministic-after-deal East-round simulator.
+    """Small, deterministic-after-deal East/South-round simulator.
 
     The wall (including the dead wall) is shuffled exactly once per hand. All later
     draws are simple pops, so replaying a seed and the same decisions gives the same
@@ -158,6 +158,7 @@ class MahjongGame:
         ai_temperatures: float | list[float] | None = None,
         assist_mode: str | None = None,
         language: str = "en",
+        match_length: str = "east",
     ) -> None:
         self.rng = random.Random(seed)
         self.seed = seed
@@ -170,6 +171,13 @@ class MahjongGame:
         if language not in {"en", "zh", "ja"}:
             raise ValueError("language must be en, zh, or ja.")
         self.language = language
+        match_length = match_length.strip().lower()
+        if match_length not in {"east", "south"}:
+            raise ValueError("match_length must be east or south.")
+        self.match_length = match_length
+        self.target_round_wind_index = 0 if match_length == "east" else 1
+        self.round_wind_index = 0
+        self.extension_threshold = 30_000
         if assist_mode not in {None, "normal", "hint"}:
             raise ValueError("assist_mode must be normal or hint.")
         self.assist_mode = assist_mode
@@ -220,6 +228,7 @@ class MahjongGame:
         self.last_hand_settlement: dict[str, object] | None = None
         self.final_summary: dict[str, object] | None = None
         self._last_win_details: list[dict[str, object]] = []
+        self._current_hand_match_ends = False
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -324,6 +333,45 @@ class MahjongGame:
             return {"chi": "吃", "pon": "碰", "kan": "杠"}.get(kind, kind)
         return {"chi": "チー", "pon": "ポン", "kan": "カン"}.get(kind, kind)
 
+    @property
+    def round_wind(self) -> str:
+        return WINDS[min(self.round_wind_index, 3)]
+
+    def _round_name(self) -> str:
+        names = {
+            "en": {"E": "East", "S": "South", "W": "West", "N": "North"},
+            "zh": {"E": "东", "S": "南", "W": "西", "N": "北"},
+            "ja": {"E": "東", "S": "南", "W": "西", "N": "北"},
+        }
+        return names[self.language][self.round_wind]
+
+    def _threshold_is_active(self) -> bool:
+        return self.round_wind_index > self.target_round_wind_index or (
+            self.round_wind_index == self.target_round_wind_index and self.round_hand == 3
+        )
+
+    def _is_all_last_context(self) -> bool:
+        """Placement-sensitive final/extension phase for AI push-fold decisions."""
+        return self._threshold_is_active()
+
+    def _should_end_match_after_hand(self, dealer_continues: bool) -> bool:
+        # Zero points is playable; only a negative post-settlement score causes bust-out.
+        if any(player.points < 0 for player in self.players):
+            return True
+        leader_points = max(player.points for player in self.players)
+        if self._threshold_is_active() and leader_points >= self.extension_threshold:
+            return True
+        # West 4 is the extension safety cap; dealer continuations may still repeat it.
+        return self.round_wind_index >= 2 and self.round_hand == 3 and not dealer_continues
+
+    def _advance_round(self) -> None:
+        self.dealer = (self.dealer + 1) % 4
+        self.round_hand += 1
+        if self.round_hand >= 4:
+            self.round_hand = 0
+            self.round_wind_index += 1
+        self.honba = 0
+
     def play(self) -> None:
         if self.interactive and self.assist_mode is None:
             self.assist_mode = self._choose_assist_mode()
@@ -334,22 +382,37 @@ class MahjongGame:
             + (f"(T={p.ai_temperature:g})" if p.ai_level == "advanced" else "")
             for p in self.players
         )
+        match_name = self._t(
+            "East" if self.match_length == "east" else "South",
+            "东风" if self.match_length == "east" else "南风",
+            "東風" if self.match_length == "east" else "半荘",
+        )
         if self.language == "zh":
             mode = "提示" if self.assist_mode == "hint" else "普通"
-            print(f"东风战开始（种子={self.seed!r}；模式={mode}；{levels}）。")
+            print(f"{match_name}战开始（种子={self.seed!r}；模式={mode}；{levels}）。")
         elif self.language == "ja":
             mode = "ヒント" if self.assist_mode == "hint" else "通常"
-            print(f"東風戦開始（シード={self.seed!r}；モード={mode}；{levels}）。")
+            print(f"{match_name}戦開始（シード={self.seed!r}；モード={mode}；{levels}）。")
         else:
-            print(f"East-round game started (seed={self.seed!r}; mode={self.assist_mode}; {levels}).")
-        while self.round_hand < 4 and all(p.points > 0 for p in self.players):
+            print(f"{match_name}-round game started (seed={self.seed!r}; mode={self.assist_mode}; {levels}).")
+        while True:
             dealer_continues = self._play_hand()
+            if self._current_hand_match_ends:
+                break
             if dealer_continues:
                 self.honba += 1
             else:
-                self.dealer = (self.dealer + 1) % 4
-                self.round_hand += 1
-                self.honba = 0
+                previous_wind = self.round_wind_index
+                self._advance_round()
+                if (
+                    self.round_wind_index > previous_wind
+                    and previous_wind >= self.target_round_wind_index
+                ):
+                    print(self._t(
+                        f"Match extends into {self._round_name()}.",
+                        f"首位未满{self.extension_threshold}点，进入{self._round_name()}入。",
+                        f"トップが{self.extension_threshold}点未満のため、{self._round_name()}入します。",
+                    ))
         # If the match ends with unclaimed riichi sticks, award them to the current
         # first-place player so the final player scores still total 100,000.
         if self.riichi_sticks:
@@ -376,6 +439,10 @@ class MahjongGame:
                 f"{s.deal_in:>7} {s.riichi:>6} {s.chi:>3} {s.pon:>3} {s.kan:>3}"
             )
         self.final_summary = {
+            "match_length": self.match_length,
+            "final_round_wind": self.round_wind,
+            "final_round_hand": self.round_hand,
+            "extended": self.round_wind_index > self.target_round_wind_index,
             "ranking": [
                 {
                     "rank": rank, "seat": seat, "name": self._name(player),
@@ -426,9 +493,8 @@ class MahjongGame:
             p.stats.hands += 1
         dealer_continues = self._play_hand_core()
         self._finalize_ai_hand_metrics()
-        match_ends = any(p.points <= 0 for p in self.players) or (
-            self.round_hand == 3 and not dealer_continues
-        )
+        match_ends = self._should_end_match_after_hand(dealer_continues)
+        self._current_hand_match_ends = match_ends
         self._show_hand_settlement(before, dealer_continues, match_ends=match_ends)
         if self.interactive:
             input(self._t(
@@ -453,13 +519,13 @@ class MahjongGame:
         for p in self.players:
             p.sort()
         if self.language == "zh":
-            print(f"\n东{self.round_hand + 1}局，庄家={self._name(self.players[self.dealer])}，本场={self.honba}")
+            print(f"\n{self._round_name()}{self.round_hand + 1}局，庄家={self._name(self.players[self.dealer])}，本场={self.honba}")
             print(f"宝牌：{' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
         elif self.language == "ja":
-            print(f"\n東{self.round_hand + 1}局、親={self._name(self.players[self.dealer])}、本場={self.honba}")
+            print(f"\n{self._round_name()}{self.round_hand + 1}局、親={self._name(self.players[self.dealer])}、本場={self.honba}")
             print(f"ドラ：{' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
         else:
-            print(f"\nEast {self.round_hand + 1}, dealer={self._name(self.players[self.dealer])}, honba={self.honba}")
+            print(f"\n{self._round_name()} {self.round_hand + 1}, dealer={self._name(self.players[self.dealer])}, honba={self.honba}")
             print(f"Dora: {' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
 
         turn = self.dealer
@@ -527,6 +593,8 @@ class MahjongGame:
         win_type = "ron" if losers else "tsumo" if winners else "draw"
         self.last_hand_settlement = {
             "round_hand": self.round_hand,
+            "round_wind": self.round_wind,
+            "round_wind_index": self.round_wind_index,
             "honba": self.honba,
             "dealer": self.dealer,
             "win_type": win_type,
@@ -594,7 +662,7 @@ class MahjongGame:
             hand_text=" ".join(ordered), win_tile_text=win_tile, win_type=win_type,
             is_dealer=seat == self.dealer, dora_text=dora,
             ura_dora_text=ura_dora,
-            seat_wind=WINDS[(seat - self.dealer) % 4], round_wind="E",
+            seat_wind=WINDS[(seat - self.dealer) % 4], round_wind=self.round_wind,
             riichi=p.riichi, furo_sets=len(open_melds),
             kan_sets=sum(m.kind == "kan" for m in open_melds),
             ankan_tiles=[m.tiles[0] for m in closed_kans],
@@ -780,7 +848,7 @@ class MahjongGame:
         if tile in dora_tiles:
             value += 6.0
         seat_wind = WINDS[(seat - self.dealer) % 4]
-        if tile in {"P", "F", "C", "E", seat_wind}:
+        if tile in {"P", "F", "C", self.round_wind, seat_wind}:
             value += 2.0 + min(2, p.hand.count(tile))
         i = tile_to_index(tile)
         if i < 27:
@@ -905,10 +973,10 @@ class MahjongGame:
         late_round = max((len(other.river) for other in self.players), default=0) >= 12
         multiple = len(threats) >= 2
         dealer_threat = self.dealer in threats
-        if self.round_hand == 3 and rank == 4:
+        if self._is_all_last_context() and rank == 4:
             if shanten <= 1 or (shanten == 2 and ukeire_total >= 16):
                 return "push" if hand_value >= needed or shanten == 0 else "balanced"
-        if self.round_hand == 3 and rank == 1 and ahead >= 8000 and shanten >= 1:
+        if self._is_all_last_context() and rank == 1 and ahead >= 8000 and shanten >= 1:
             return "fold"
         if shanten >= 3:
             return "fold"
@@ -988,7 +1056,7 @@ class MahjongGame:
         dora_tiles = {dora_from_indicator(indicator) for indicator in self.dora_indicators}
         dora_count = sum(tile in dora_tiles for tile in self._full_for_analysis(player))
         seat_wind = WINDS[(seat - self.dealer) % 4]
-        value_tiles = {"P", "F", "C", "E", seat_wind}
+        value_tiles = {"P", "F", "C", self.round_wind, seat_wind}
         yakuhai = sum(
             meld.kind in {"pon", "kan"} and meld.tiles[0] in value_tiles for meld in player.melds
         )
@@ -1012,10 +1080,10 @@ class MahjongGame:
 
         # Very late or nearly dead waits should not spend a stick unless the hand
         # needs riichi as its only yaku or the final-hand placement requires action.
-        if remaining_wall <= 8 and live <= 2 and not (self.round_hand == 3 and rank == 4):
+        if remaining_wall <= 8 and live <= 2 and not (self._is_all_last_context() and rank == 4):
             return not dama_yaku and live > 0 and expected >= 3900
         # In East 4, placement requirements override generic aggression.
-        if self.round_hand == 3:
+        if self._is_all_last_context():
             if rank == 1:
                 return good_wait and expected >= 8000 and ahead >= 8000 and not threats
             if rank == 4:
@@ -1202,7 +1270,7 @@ class MahjongGame:
                     if opts:
                         self.players[caller].stats.call_opportunities += 1
                     self.players[caller].stats.call_decision_seconds += time.perf_counter() - started
-                elif tile in {"P", "F", "C", "E", seat_wind}:
+                elif tile in {"P", "F", "C", self.round_wind, seat_wind}:
                     chosen = next((o for o in reversed(opts) if o[0] in {"pon", "kan"}), None)
             if chosen:
                 kind, meld_tiles = chosen
@@ -1332,7 +1400,7 @@ class MahjongGame:
         before_visible = self._visible_counts(caller)
         before_ukeire = self._ukeire(p, before_visible)[1]
         seat_wind = WINDS[(caller - self.dealer) % 4]
-        value_honor = tile in {"P", "F", "C", "E", seat_wind}
+        value_honor = tile in {"P", "F", "C", self.round_wind, seat_wind}
         # A closed hand that is already tenpai should preserve its riichi route.
         if p.is_closed and before_shanten <= 0:
             return None

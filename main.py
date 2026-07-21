@@ -222,6 +222,12 @@ def main() -> None:
         default=None,
         help="Game display language: en, zh, or ja",
     )
+    ap.add_argument(
+        "--match-length",
+        choices=["east", "south"],
+        default=None,
+        help="Game length: east (East-only) or south (East+South)",
+    )
     args = ap.parse_args()
 
     config: dict[str, Any] = {}
@@ -251,6 +257,10 @@ def main() -> None:
         )
         assist_mode = args.assist_mode if args.assist_mode is not None else game_cfg.get("assist_mode")
         language = args.language if args.language is not None else game_cfg.get("language", config.get("language", "en"))
+        match_length = (
+            args.match_length if args.match_length is not None
+            else str(game_cfg.get("match_length", "east")).lower()
+        )
         levels = None
         if levels_value:
             if isinstance(levels_value, str):
@@ -267,6 +277,7 @@ def main() -> None:
                 ai_temperatures=temperatures,
                 assist_mode=str(assist_mode).lower() if assist_mode else None,
                 language=str(language),
+                match_length=match_length,
             ).play()
         except ValueError as e:
             ap.error(str(e))

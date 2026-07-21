@@ -1,5 +1,14 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/21/2026
+
+- Added East-match and South-match selection to the desktop setup, CLI (`--match-length east|south`), JSON configuration (`game.match_length`), and desktop simulation tool.
+- Added 30,000-point extension rules. An East match enters South if the leader is below 30,000 after East 4; a South match enters West if the leader is below 30,000 after South 4. During extension, the result is checked after every hand; West 4 is the safety cap.
+- Corrected bankruptcy to trigger only below zero. A player on exactly zero remains in the match. Riichi remains legal at exactly 1,000 points and illegal below 1,000.
+- Added true round-wind state throughout scoring, value-honor calls, AI hand valuation, table/settlement labels, and final results. South is therefore correctly treated as yakuhai during the South round.
+- Updated Advanced AI v1 placement logic so final-hand push/fold and comeback decisions activate in the selected match's all-last and extension hands, rather than treating every East 4 as the end of a South match.
+- Added round progression, South-round scoring, zero/negative-point, riichi affordability, desktop selection, and extension tests; the full suite now contains 61 passing tests. A fixed-seed East match was verified to enter South and finish with 100,000 total points.
+
 ## Updates 7/19/2026
 
 - Added real in-match ura-dora scoring. Each shuffled dead wall now fixes parallel visible-dora and ura-dora indicators; ura-dora is revealed and counted only after a riichi player actually wins, including the additional indicator pairs revealed by kans.
@@ -156,9 +165,9 @@ It also tracks remaining tile counts (tiles unseen in your hand + river).
   - `points.win_tile` (the winning tile)
   - `points.win_type` (`"ron"` or `"tsumo"`)
   - optional: dora / riichi / ankan
-- **`game`**: play a complete East-round simulation against three shanten-driven AIs.
+- **`game`**: play a complete East or South match against three shanten-driven AIs.
 
-## East-round simulation
+## East/South match simulation
 
 Start an interactive game (you are always `You`; enter a tile or its displayed index):
 
@@ -180,6 +189,7 @@ Set the display language at the root of `default_config.json`:
   "language": "zh",
   "game": {
     "assist_mode": "hint",
+    "match_length": "south",
     "ai_levels": ["basic_v1", "advanced_v1", "advanced_v1", "basic_v1"]
   }
 }
@@ -212,9 +222,10 @@ python -m unittest test_game_ai.py
 
 Use `--auto-game` for a hands-off smoke test. A wall is shuffled once at the start
 of each hand and is deterministic thereafter; the same seed plus the same choices
-replays the same walls. The match uses 25,000 starting points, East 1 through East
-4, dealer continuations, honba, riichi sticks, ron/tsumo settlement, exhaustive
-draws, and immediate termination when any score falls below zero. The three AIs
+replays the same walls. The match uses 25,000 starting points, selectable East-only
+or East+South regulation rounds, dealer continuations, honba, riichi sticks,
+ron/tsumo settlement, exhaustive draws, 30,000-point extension, and immediate
+termination when any score falls below zero. The three AIs
 minimize standard-hand shanten and normally remain closed for riichi; they only
 open value-honor pon/kan, so they do not claim a no-yaku win. Scoring is delegated
 to the existing scoring module.
@@ -368,7 +379,7 @@ Launch the playable desktop preview (no third-party packages required):
 python desktop_ui.py
 ```
 
-The setup screen selects language, Basic AI v1 or Advanced AI v1 opponents,
+The setup screen selects East/South match length, language, Basic AI v1 or Advanced AI v1 opponents,
 temperature, normal/hint mode, and an optional replay seed. Leave the seed blank to
 generate a random seed; the actual value is shown in the game log and center panel
 so the match can be replayed later. During play, click a
@@ -385,10 +396,10 @@ python simulate_desktop_game.py --games 4 --profile advanced_v1 \
   --temperature 0.2 --assist hint --calls accept --json desktop_simulation.json
 ```
 
-Run an interactive East-round match:
+Run an interactive South match:
 
 ```bash
-python main.py --mode game --language en
+python main.py --mode game --language en --match-length south
 ```
 
 Useful options:
@@ -400,6 +411,7 @@ Useful options:
 - `--ai-temperature 0.2`: controls constrained advanced-AI style variation. `0` is fully deterministic; `0.2` is recommended; high values create more variety and variance.
 - `--auto-game`: lets the computer control all four seats for testing or simulation.
 - `--language en|zh|ja`: selects English, Chinese, or Japanese game UI.
+- `--match-length east|south`: selects an East-only match or an East+South match.
 
 The same settings can be stored in JSON:
 
@@ -409,6 +421,7 @@ The same settings can be stored in JSON:
   "language": "en",
   "game": {
     "seed": 2026,
+    "match_length": "south",
     "assist_mode": "hint",
     "ai_levels": ["basic_v1", "advanced_v1", "advanced_v1", "basic_v1"],
     "ai_temperature": [0.0, 0.2, 0.2, 0.35]
@@ -419,10 +432,11 @@ The same settings can be stored in JSON:
 ### 2. Match structure
 
 - Every player starts with 25,000 points.
-- A match runs from East 1 through East 4.
+- An East match normally runs East 1–4; a South match normally runs East 1–South 4.
 - A dealer win or dealer tenpai at an exhaustive draw causes a continuation and adds one honba.
 - A non-dealer win, or a dealer-noten exhaustive draw, rotates the dealer.
-- The match ends after East 4 rotates or immediately when any player reaches zero or below.
+- At the regulation final hand, a leader on 30,000 or more ends the match; otherwise play extends into South (East match) or West (South match), checking the threshold after every extension hand.
+- Exactly zero points remains playable; a post-settlement negative score ends the match. Riichi requires at least 1,000 points.
 - Final ranking is sorted by score. Remaining riichi sticks are awarded to the current first-place player.
 
 ### 3. Player turn display
@@ -543,10 +557,10 @@ python simulate_desktop_game.py --games 4 --profile advanced_v1 \
   --temperature 0.2 --assist hint --calls accept --json desktop_simulation.json
 ```
 
-启动主视角东风战：
+启动主视角南风战：
 
 ```bash
-python main.py --mode game --language zh
+python main.py --mode game --language zh --match-length south
 ```
 
 常用参数：
@@ -557,6 +571,7 @@ python main.py --mode game --language zh
 - `--ai-levels basic_v1,advanced_v1,advanced_v1,basic_v1`：按照“玩家、电脑1、电脑2、电脑3”的座位顺序设置版本化电脑。交互模式下第一个座位仍由玩家控制；旧名称 `simple/advanced` 仍可兼容使用。
 - `--auto-game`：四个座位全部交给电脑，用于测试和批量模拟。
 - `--language en|zh|ja`：选择英文、中文或日文牌局界面。
+- `--match-length east|south`：选择东风战或包含东场、南场的南风战。
 - `--ai-temperature 0.2`：设置高级电脑的受约束风格随机性。`0` 完全固定，推荐使用 `0.2`；更高数值会增加变化和结果方差。
 
 也可以写入 JSON 配置：
@@ -567,6 +582,7 @@ python main.py --mode game --language zh
   "language": "zh",
   "game": {
     "seed": 2026,
+    "match_length": "south",
     "assist_mode": "hint",
     "ai_levels": ["basic_v1", "advanced_v1", "advanced_v1", "basic_v1"],
     "ai_temperature": [0.0, 0.2, 0.2, 0.35]
@@ -577,10 +593,11 @@ python main.py --mode game --language zh
 ### 2. 对局结构
 
 - 四家初始点数均为25,000点。
-- 东风战从东一局进行至东四局。
+- 东风战通常进行东一至东四；南风战通常进行东一至南四。
 - 庄家和牌，或流局时庄家听牌，则连庄并增加一本场。
 - 闲家和牌，或流局时庄家未听牌，则轮庄。
-- 东四局轮庄后结束；任何玩家点数降至0点或以下时立即提前结束。
+- 规定最后一局结算后，首位达到30,000点则结束；不足30,000点时，东风战南入、南风战西入，并在延长赛每个小局后重新判断。西四为延长赛安全上限。
+- 玩家恰好0点时仍可继续，结算后低于0点才击飞并结束；立直需要至少1,000点，低于1,000点不能立直。
 - 最终按点数排名；终局无人领取的立直棒交给当前第一名。
 
 ### 3. 玩家出牌界面
@@ -652,7 +669,7 @@ python benchmark_ai.py --games 24 --workers 4 --seed 800 \
 
 每个小局结束后会显示四家当前点数、本局点数变化，以及连庄或轮庄结果。交互模式会等待玩家确认后再进入下一局。整场结束后自动显示最终点数、排名，以及每家的小局数、和牌、荣和、自摸、放铳、立直、吃、碰、杠数据。
 
-桌面版会把每小局结算显示为牌桌中央的大型结算卡，明确标注荣和、自摸或流局、赢家、放铳者、四家点数变化和连庄/轮庄。有人和牌时还会展示最终役种、表宝牌/赤宝牌/里宝牌、最终点数、里宝牌指示牌，以及四家的完整暗手与副露；荣和会明确写出“谁和了谁”，自摸会明确标注自摸者。点击“确认并进入下一局”后才会继续。东风战结束后，中央终局卡会持续显示最终排名、点数、和牌、荣和、自摸、放铳和立直次数，直到玩家主动返回标题。每家状态框还会持续显示相对当前庄家的自风；轮庄后东南西北会自动更新。
+桌面版会把每小局结算显示为牌桌中央的大型结算卡，明确标注荣和、自摸或流局、赢家、放铳者、四家点数变化和连庄/轮庄。有人和牌时还会展示最终役种、表宝牌/赤宝牌/里宝牌、最终点数、里宝牌指示牌，以及四家的完整暗手与副露；荣和会明确写出“谁和了谁”，自摸会明确标注自摸者。点击“确认并进入下一局”后才会继续。对局结束后，中央终局卡会持续显示最终场次（包括南入/西入）、排名、点数、和牌、荣和、自摸、放铳和立直次数，直到玩家主动返回标题。每家状态框还会持续显示相对当前庄家的自风；轮庄后东南西北会自动更新。
 
 ### 8. 当前规则支持范围
 

@@ -53,6 +53,7 @@ class SimulatedDesktopPlayer:
 def run_simulated_match(
     *, seed: int, opponent_profile: str = "advanced_v1",
     temperature: float = 0.2, assist_mode: str = "hint", accept_calls: bool = False,
+    match_length: str = "east",
 ) -> dict[str, Any]:
     game = MahjongGame(
         seed=seed,
@@ -61,6 +62,7 @@ def run_simulated_match(
         ai_temperatures=[0.0, temperature, temperature, temperature],
         assist_mode=assist_mode,
         language="en",
+        match_length=match_length,
     )
     player = SimulatedDesktopPlayer(game, accept_calls=accept_calls)
     output = io.StringIO()
@@ -79,9 +81,12 @@ def run_simulated_match(
         "temperature": temperature,
         "assist_mode": assist_mode,
         "accept_calls": accept_calls,
+        "match_length": match_length,
         "elapsed_seconds": elapsed,
         "point_total": sum(p.points for p in game.players),
         "round_hand": game.round_hand,
+        "round_wind": game.round_wind,
+        "round_wind_index": game.round_wind_index,
         "hands": game.players[0].stats.hands,
         "prompts": dict(player.prompts),
         "player_discards": len(player.discards),
@@ -100,13 +105,14 @@ def run_simulated_match(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Simulate complete desktop-style East matches.")
+    parser = argparse.ArgumentParser(description="Simulate complete desktop-style Mahjong matches.")
     parser.add_argument("--games", type=int, default=4)
     parser.add_argument("--seed", type=int, default=6000)
     parser.add_argument("--profile", choices=("basic_v1", "advanced_v1"), default="advanced_v1")
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--assist", choices=("normal", "hint"), default="hint")
     parser.add_argument("--calls", choices=("pass", "accept"), default="pass")
+    parser.add_argument("--match-length", choices=("east", "south"), default="east")
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     if args.games < 1 or not 0 <= args.temperature <= 1:
@@ -116,12 +122,13 @@ def main() -> None:
             seed=args.seed + index, opponent_profile=args.profile,
             temperature=args.temperature, assist_mode=args.assist,
             accept_calls=args.calls == "accept",
+            match_length=args.match_length,
         )
         for index in range(args.games)
     ]
     elapsed = sum(result["elapsed_seconds"] for result in results)
     print(
-        f"{len(results)} complete East matches | {sum(r['hands'] for r in results)} hands | "
+        f"{len(results)} complete {args.match_length.title()} matches | {sum(r['hands'] for r in results)} hands | "
         f"{elapsed:.1f}s | invalid totals={sum(r['point_total'] != 100_000 for r in results)} | "
         f"incomplete hints={sum(not r['hint_complete'] for r in results)}"
     )

@@ -30,6 +30,7 @@ PROFILE_DISPLAY_TO_ID = {
     profile.display_name: profile_id for profile_id, profile in AI_PROFILES.items()
 }
 FONT_SCALES = {"小 / Small": 0.85, "中 / Medium": 1.0, "大 / Large": 1.25}
+MATCH_LENGTH_DISPLAY_TO_ID = {"东风战 / East": "east", "南风战 / South": "south"}
 WIND_NAMES = {
     "zh": {"E": "东", "S": "南", "W": "西", "N": "北"},
     "en": {"E": "East", "S": "South", "W": "West", "N": "North"},
@@ -165,7 +166,7 @@ class MahjongDesktopApp:
             font=("Arial", 26, "bold"),
         ).grid(row=0, column=0, columnspan=2, pady=(0, 6))
         tk.Label(
-            card, text="单机东风战 · Desktop Preview", bg=COLORS["panel"],
+            card, text="单机立直麻将 · Desktop Preview", bg=COLORS["panel"],
             fg=COLORS["muted"], font=("Arial", 12),
         ).grid(row=1, column=0, columnspan=2, pady=(0, 26))
 
@@ -175,10 +176,15 @@ class MahjongDesktopApp:
         self.assist_var = tk.StringVar(value="hint")
         self.seed_var = tk.StringVar(value="")
         self.font_size_var = tk.StringVar(value="中 / Medium")
+        self.match_length_var = tk.StringVar(value="东风战 / East")
         fields = [
             ("界面语言 / Language", ttk.Combobox(
                 card, textvariable=self.language_var, state="readonly",
                 values=("zh", "en", "ja"), width=24,
+            )),
+            ("对局长度 / Match", ttk.Combobox(
+                card, textvariable=self.match_length_var, state="readonly",
+                values=tuple(MATCH_LENGTH_DISPLAY_TO_ID), width=24,
             )),
             ("电脑版本 / AI", ttk.Combobox(
                 card, textvariable=self.profile_var, state="readonly",
@@ -200,10 +206,10 @@ class MahjongDesktopApp:
             )
             widget.grid(row=row, column=1, sticky="ew", pady=7)
         tk.Label(card, text="AI 温度 / Temperature", bg=COLORS["panel"], fg=COLORS["ink"]).grid(
-            row=7, column=0, sticky="w", padx=(0, 22), pady=7
+            row=8, column=0, sticky="w", padx=(0, 22), pady=7
         )
         temp_row = tk.Frame(card, bg=COLORS["panel"])
-        temp_row.grid(row=7, column=1, sticky="ew")
+        temp_row.grid(row=8, column=1, sticky="ew")
         ttk.Scale(temp_row, from_=0, to=1, variable=self.temperature_var).pack(
             side="left", fill="x", expand=True
         )
@@ -212,8 +218,8 @@ class MahjongDesktopApp:
         self.temperature_var.trace_add(
             "write", lambda *_: self.temp_label.config(text=f"{self.temperature_var.get():.2f}")
         )
-        ttk.Button(card, text="开始东风战", style="Accent.TButton", command=self._start).grid(
-            row=8, column=0, columnspan=2, sticky="ew", pady=(28, 0)
+        ttk.Button(card, text="开始对局", style="Accent.TButton", command=self._start).grid(
+            row=9, column=0, columnspan=2, sticky="ew", pady=(28, 0)
         )
 
     def _apply_font_scale(self) -> None:
@@ -338,6 +344,7 @@ class MahjongDesktopApp:
             messagebox.showerror("Invalid seed", "Seed 必须是整数或留空。")
             return
         profile = PROFILE_DISPLAY_TO_ID.get(self.profile_var.get(), self.profile_var.get())
+        match_length = MATCH_LENGTH_DISPLAY_TO_ID[self.match_length_var.get()]
         temperature = float(self.temperature_var.get())
         self._apply_font_scale()
         self._build_game()
@@ -348,6 +355,7 @@ class MahjongDesktopApp:
             ai_temperatures=[0.0, temperature, temperature, temperature],
             assist_mode=self.assist_var.get(),
             language=self.language_var.get(),
+            match_length=match_length,
         )
         self.active_seed = seed
         self.abort_requested = False
@@ -557,9 +565,10 @@ class MahjongDesktopApp:
                     )
                 )
             doras = " ".join(display_tile(dora_from_indicator(tile), game.language) for tile in list(game.dora_indicators)) or "—"
+            round_name = WIND_NAMES[game.language][game.round_wind]
             self.center_label.config(
                 text=(
-                    f"东 {game.round_hand + 1} 局\n"
+                    f"{round_name} {game.round_hand + 1} 局\n"
                     f"本场 {game.honba}  ·  立直棒 {game.riichi_sticks}\n"
                     f"牌山 {len(game.wall)}\n宝牌 {doras}"
                     f"\n种子 {self.active_seed}"
@@ -682,12 +691,13 @@ class MahjongDesktopApp:
                 lines.append(f"{hand_data['name']}：{tiles}{winning}{suffix}")
         lines.extend(("", "庄家连庄" if settlement["dealer_continues"] else "庄家轮庄"))
         hand_number = int(settlement["round_hand"]) + 1
+        round_name = WIND_NAMES[self.game.language][str(settlement["round_wind"])]
         button_text = (
             "确认并查看最终结果 / Final results"
             if settlement.get("match_ends") else "确认并进入下一局 / Continue"
         )
         self._show_summary(
-            f"东{hand_number}局 结算", lines, continue_text=button_text, wide=True
+            f"{round_name}{hand_number}局 结算", lines, continue_text=button_text, wide=True
         )
 
     def _continue_after_settlement(self) -> None:
@@ -698,14 +708,20 @@ class MahjongDesktopApp:
     def _show_final_summary(self) -> None:
         if self.game is None or self.game.final_summary is None:
             return
-        lines: list[str] = []
+        final_wind = WIND_NAMES[self.game.language][str(self.game.final_summary["final_round_wind"])]
+        extension = "（延长赛）" if self.game.final_summary["extended"] else ""
+        lines: list[str] = [
+            f"结束于：{final_wind}{int(self.game.final_summary['final_round_hand']) + 1}局{extension}",
+            "",
+        ]
         for row in self.game.final_summary["ranking"]:
             lines.append(
                 f"{row['rank']}位  {row['name']:<6} {row['points']:>6,}点  "
                 f"和牌{row['wins']}  荣和{row['ron']}  自摸{row['tsumo']}  "
                 f"放铳{row['deal_in']}  立直{row['riichi']}"
             )
-        self._show_summary("东风战 最终排名", lines, final=True)
+        match_name = "东风战" if self.game.match_length == "east" else "南风战"
+        self._show_summary(f"{match_name} 最终排名", lines, final=True)
 
     def _render_hand(self, *, force: bool = False) -> None:
         if self.game is None or not hasattr(self, "hand_frame"):
@@ -756,6 +772,7 @@ class MahjongDesktopApp:
             "language": self.language_var.get(), "profile": self.profile_var.get(),
             "temperature": self.temperature_var.get(), "assist": self.assist_var.get(),
             "font_size": self.font_size_var.get(), "seed": self.seed_var.get(),
+            "match_length": self.match_length_var.get(),
         }
         if hasattr(self, "screen") and self.screen.winfo_exists():
             self.screen.destroy()
@@ -773,6 +790,7 @@ class MahjongDesktopApp:
         self.temperature_var.set(settings["temperature"])
         self.assist_var.set(settings["assist"])
         self.font_size_var.set(settings["font_size"])
+        self.match_length_var.set(settings["match_length"])
         self.seed_var.set(settings["seed"])
 
     def _quit(self) -> None:

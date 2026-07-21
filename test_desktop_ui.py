@@ -8,6 +8,7 @@ from desktop_ui import (
     FONT_SCALES,
     GameAborted,
     MahjongDesktopApp,
+    MATCH_LENGTH_DISPLAY_TO_ID,
     PROFILE_DISPLAY_TO_ID,
     TABLE_POSITIONS,
     QueueWriter,
@@ -77,6 +78,10 @@ class DesktopUIAdapterTests(unittest.TestCase):
         self.assertEqual(FONT_SCALES["中 / Medium"], 1.0)
         self.assertLess(FONT_SCALES["小 / Small"], 1.0)
         self.assertGreater(FONT_SCALES["大 / Large"], 1.0)
+
+    def test_desktop_offers_east_and_south_matches(self) -> None:
+        self.assertEqual(MATCH_LENGTH_DISPLAY_TO_ID["东风战 / East"], "east")
+        self.assertEqual(MATCH_LENGTH_DISPLAY_TO_ID["南风战 / South"], "south")
 
     def test_seat_winds_rotate_with_the_dealer(self) -> None:
         self.assertEqual([seat_wind(seat, 0) for seat in range(4)], ["E", "S", "W", "N"])

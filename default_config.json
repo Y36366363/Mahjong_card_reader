@@ -4,6 +4,7 @@
   "hand": "1m 1m 1m 2m 3m 4m 0m 6m 7m 8m 9s 9s 9s",
   "river": "9p 9p 9p",
   "game": {
+    "match_length": "east",
     "ai_levels": ["advanced_v1", "advanced_v1", "advanced_v1", "advanced_v1"],
     "ai_temperature": 0.2
   },

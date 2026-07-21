@@ -100,6 +100,60 @@ class AdvancedAITests(unittest.TestCase):
             MahjongGame(ai_levels=["unknown"] * 4)
         with self.assertRaises(ValueError):
             MahjongGame(ai_temperatures=1.1)
+        with self.assertRaises(ValueError):
+            MahjongGame(match_length="west")
+
+    def test_match_length_round_progression_and_extension_threshold(self) -> None:
+        east = MahjongGame(match_length="east")
+        east.round_hand = 3
+        for player, points in zip(east.players, (29_000, 27_000, 24_000, 20_000)):
+            player.points = points
+        self.assertFalse(east._should_end_match_after_hand(False))
+        east._advance_round()
+        self.assertEqual((east.round_wind, east.round_hand), ("S", 0))
+        east.players[0].points = 30_000
+        self.assertTrue(east._should_end_match_after_hand(False))
+
+        south = MahjongGame(match_length="south")
+        south.round_wind_index = 1; south.round_hand = 3
+        for player, points in zip(south.players, (29_000, 27_000, 24_000, 20_000)):
+            player.points = points
+        self.assertFalse(south._should_end_match_after_hand(False))
+        south._advance_round()
+        self.assertEqual((south.round_wind, south.round_hand), ("W", 0))
+
+    def test_zero_points_survives_but_negative_points_busts(self) -> None:
+        game = MahjongGame()
+        game.round_hand = 3
+        game.players[0].points = 0
+        game.players[1].points = 29_000
+        game.players[2].points = 36_000
+        game.players[3].points = 35_000
+        self.assertTrue(game._should_end_match_after_hand(False))  # leader reached 30k
+        game.round_hand = 0
+        self.assertFalse(game._should_end_match_after_hand(False))
+        game.players[0].points = -100
+        self.assertTrue(game._should_end_match_after_hand(True))
+
+    def test_south_round_wind_is_used_for_yakuhai_scoring(self) -> None:
+        game = MahjongGame()
+        game.dealer = 2  # seat 0 is West, so South is only the round wind here
+        game.players[0].hand = "1m 2m 3m 1p 2p 3p 1s 2s 3s S S S P".split()
+        game.round_wind_index = 0
+        self.assertIsNone(game._try_score(0, "P", "ron"))
+        game.round_wind_index = 1
+        self.assertIsNotNone(game._try_score(0, "P", "ron"))
+
+    def test_player_below_1000_cannot_declare_riichi(self) -> None:
+        game = MahjongGame(interactive=True, language="zh")
+        player = game.players[0]
+        player.points = 999
+        player.hand = "1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P 9m".split()
+        player.sort()
+        with patch("builtins.input", side_effect=["9m"]):
+            self.assertEqual(game._choose_discard(0), "9m")
+        self.assertFalse(player.riichi)
+        self.assertEqual(player.points, 999)
 
     def test_temperature_is_reproducible_and_never_crosses_shanten_guard(self) -> None:
         game = MahjongGame(seed=77, ai_levels=["advanced"] * 4, ai_temperatures=0.8)
