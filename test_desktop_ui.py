@@ -17,8 +17,10 @@ from desktop_ui import (
     display_hand_order,
     display_text,
     display_tile,
+    concealed_columns_for_seat,
     resolve_desktop_seed,
     seat_wind,
+    tile_grid_positions,
     valid_hint_tile,
 )
 
@@ -67,6 +69,14 @@ class DesktopUIAdapterTests(unittest.TestCase):
         backs = concealed_tile_backs(13)
         self.assertEqual(backs.count("🀫"), 13)
         self.assertIn("\n", backs)
+
+    def test_opponent_tile_cards_use_horizontal_rows_with_side_wrapping(self) -> None:
+        self.assertEqual(concealed_columns_for_seat(2), 14)
+        self.assertEqual(concealed_columns_for_seat(1), 7)
+        self.assertEqual(tile_grid_positions(14, 14)[-1], (0, 13))
+        self.assertEqual(tile_grid_positions(13, 7)[-1], (1, 5))
+        with self.assertRaises(ValueError):
+            tile_grid_positions(4, 0)
 
     def test_stale_hint_is_never_shown_for_an_absent_tile(self) -> None:
         hand = ["1m", "2m", "E"]

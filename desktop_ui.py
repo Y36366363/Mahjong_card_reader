@@ -70,6 +70,18 @@ def concealed_tile_backs(count: int, per_line: int = 7) -> str:
     return "\n".join(" ".join(backs[i:i + per_line]) for i in range(0, count, per_line)) or "—"
 
 
+def tile_grid_positions(count: int, columns: int) -> list[tuple[int, int]]:
+    """Return stable row/column positions for a compact horizontal tile layout."""
+    if count < 0 or columns < 1:
+        raise ValueError("count must be non-negative and columns must be positive")
+    return [(index // columns, index % columns) for index in range(count)]
+
+
+def concealed_columns_for_seat(seat: int) -> int:
+    """Top opponent fits one row; side opponents wrap into two compact rows."""
+    return 14 if seat == 2 else 7
+
+
 def display_text(text: str, language: str) -> str:
     if language != "zh":
         return text
@@ -135,6 +147,7 @@ class MahjongDesktopApp:
         self.pending_kind: str | None = None
         self.recommended_tile: str | None = None
         self._last_hand: tuple[str, ...] = ()
+        self._last_public_tile_signatures: list[object | None] = [None] * 4
         self._public_states: list[tuple[bool, int]] | None = None
         self._notice_after_id: str | None = None
         self._seen_settlement: object | None = None
@@ -272,16 +285,30 @@ class MahjongDesktopApp:
         left.grid_columnconfigure(1, weight=2)
         left.grid_columnconfigure(2, weight=1)
         left.grid_rowconfigure(1, weight=1)
+        self.player_panels: list[tk.Frame | None] = [None] * 4
         self.player_labels: list[tk.Label | None] = [None] * 4
+        self.concealed_frames: list[tk.Frame | None] = [None] * 4
+        self.meld_frames: list[tk.Frame | None] = [None] * 4
         # Human perspective: self at the bottom, opposite player at the top,
         # kamicha (seat 3) on the left, and shimocha (seat 1) on the right.
         for seat, (row, column) in TABLE_POSITIONS.items():
-            label = tk.Label(
-                left, justify="left", anchor="nw", bg=COLORS["panel"], fg=COLORS["ink"],
-                font=self._font(10), padx=10, pady=8, relief="ridge", bd=2,
+            panel = tk.Frame(
+                left, bg=COLORS["panel"], padx=8, pady=7, relief="ridge", bd=2,
             )
-            label.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
+            panel.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
+            label = tk.Label(
+                panel, justify="left", anchor="nw", bg=COLORS["panel"], fg=COLORS["ink"],
+                font=self._font(10),
+            )
+            label.pack(fill="x")
+            concealed = tk.Frame(panel, bg=COLORS["panel"])
+            concealed.pack(fill="x", pady=(5, 2))
+            melds = tk.Frame(panel, bg=COLORS["panel"])
+            melds.pack(fill="x", pady=(2, 0))
+            self.player_panels[seat] = panel
             self.player_labels[seat] = label
+            self.concealed_frames[seat] = concealed
+            self.meld_frames[seat] = melds
         self.center_label = tk.Label(
             left, text="准备牌局…", justify="center", bg="#133f35", fg="white",
             font=self._font(14, "bold"), padx=12, pady=12,
@@ -298,8 +325,6 @@ class MahjongDesktopApp:
 
         bottom = tk.Frame(left, bg=COLORS["table"])
         bottom.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
-        self.meld_label = tk.Label(bottom, text="", bg=COLORS["table"], fg="white", anchor="w")
-        self.meld_label.pack(fill="x")
         self.hand_title_label = tk.Label(
             bottom, text="当前手牌 / Your hand", bg=COLORS["table"], fg="white",
             anchor="w", font=self._font(12, "bold"),
@@ -362,6 +387,7 @@ class MahjongDesktopApp:
         self.match_complete = False
         self._seen_settlement = None
         self._public_states = None
+        self._last_public_tile_signatures = [None] * 4
         self._append_log(f"Replay seed / 复现种子: {seed}\n")
         self.running = True
         threading.Thread(target=self._run_game, daemon=True).start()
@@ -516,6 +542,77 @@ class MahjongDesktopApp:
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _mini_tile(
+        self, parent: tk.Misc, *, tile: str | None, language: str, back: bool = False
+    ) -> tk.Label:
+        """Create one non-interactive table tile with a consistent physical shape."""
+        if back:
+            return tk.Label(
+                parent, text="◆", width=2, height=1, bg="#28557b", fg="#e8cf83",
+                relief="raised", bd=2, font=self._font(9, "bold"),
+                highlightbackground="#d7bd76", highlightthickness=1,
+            )
+        assert tile is not None
+        suit_color = {
+            "m": "#b33b35", "p": "#2c63a0", "s": "#278153",
+        }.get(tile[-1:] if len(tile) == 2 else "", COLORS["ink"])
+        return tk.Label(
+            parent, text=display_tile(tile, language), width=3, height=1,
+            bg=COLORS["tile"], fg=suit_color, relief="raised", bd=2,
+            font=self._font(9, "bold"),
+        )
+
+    def _render_public_tiles(self, seat: int, player: object, panel_bg: str) -> None:
+        """Render concealed backs and open meld faces inside one seat panel."""
+        concealed_frame = self.concealed_frames[seat]
+        meld_frame = self.meld_frames[seat]
+        if concealed_frame is None or meld_frame is None or self.game is None:
+            return
+        concealed_frame.config(bg=panel_bg)
+        meld_frame.config(bg=panel_bg)
+        for frame in (concealed_frame, meld_frame):
+            for child in frame.winfo_children():
+                child.destroy()
+
+        if seat != 0:
+            tk.Label(
+                concealed_frame,
+                text={"zh": f"暗牌 {len(player.hand)}张", "en": f"Concealed {len(player.hand)}",
+                      "ja": f"手牌 {len(player.hand)}枚"}[self.game.language],
+                bg=panel_bg, fg=COLORS["muted"], anchor="w", font=self._font(9),
+            ).grid(row=0, column=0, columnspan=14, sticky="w")
+            columns = concealed_columns_for_seat(seat)
+            for index, (row, column) in enumerate(tile_grid_positions(len(player.hand), columns)):
+                tile = self._mini_tile(
+                    concealed_frame, tile=None, language=self.game.language, back=True
+                )
+                tile.grid(row=row + 1, column=column, padx=1, pady=1, sticky="w")
+
+        if not player.melds:
+            tk.Label(
+                meld_frame,
+                text={"zh": "门清", "en": "Closed", "ja": "門前"}[self.game.language],
+                bg=panel_bg, fg=COLORS["muted"], anchor="w", font=self._font(9),
+            ).grid(row=0, column=0, sticky="w")
+            return
+
+        groups_per_row = 4 if seat in {0, 2} else 1
+        for meld_index, meld in enumerate(player.melds):
+            group = tk.Frame(meld_frame, bg=panel_bg)
+            group.grid(
+                row=meld_index // groups_per_row,
+                column=meld_index % groups_per_row,
+                padx=(0, 7), pady=2, sticky="w",
+            )
+            tk.Label(
+                group, text=self.game._meld_name(meld.kind), bg=panel_bg,
+                fg=COLORS["muted"], font=self._font(8),
+            ).grid(row=0, column=0, columnspan=max(1, len(meld.tiles)), sticky="w")
+            for tile_index, tile_name in enumerate(meld.tiles):
+                self._mini_tile(
+                    group, tile=tile_name, language=self.game.language
+                ).grid(row=1, column=tile_index, padx=1, pady=1)
+
     def _refresh_table(self) -> None:
         game = self.game
         if game is None or not hasattr(self, "center_label"):
@@ -544,26 +641,40 @@ class MahjongDesktopApp:
                     status.append("庄 / Dealer")
                 if player.riichi:
                     status.append("立直 / Riichi")
-                melds = " / ".join(
-                    f"{game._meld_name(meld.kind)}:{' '.join(display_tile(x, game.language) for x in meld.tiles)}" for meld in list(player.melds)
-                ) or "门清 / Closed"
                 river = " ".join(display_tile(x, game.language) for x in list(player.river)) or "—"
-                concealed = "" if seat == 0 else f"\n暗手 {len(player.hand)}张:\n{concealed_tile_backs(len(player.hand))}"
                 label = self.player_labels[seat]
-                if label is None:
+                panel = self.player_panels[seat]
+                if label is None or panel is None:
                     continue
-                label.config(
-                    bg="#ffd1ce" if player.riichi else "#fff0b8" if player.melds else COLORS["panel"],
-                    fg="#8f1712" if player.riichi else COLORS["ink"],
+                panel_bg = (
+                    "#ffd1ce" if player.riichi else
+                    "#fff0b8" if player.melds else COLORS["panel"]
+                )
+                panel.config(
+                    bg=panel_bg,
                     relief="solid" if player.riichi or player.melds else "ridge",
                     bd=4 if player.riichi else 3 if player.melds else 2,
+                )
+                label.config(
+                    bg=panel_bg,
+                    fg="#8f1712" if player.riichi else COLORS["ink"],
                     text=(
                         f"{game._name(player)}  {player.points:,}\n"
                         f"【{wind_prefix} {wind_name} ({wind})】  "
                         f"{' · '.join(status) if status else ''}\n"
-                        f"{melds}{concealed}\n河: {river}"
+                        f"河: {river}"
                     )
                 )
+                public_signature = (
+                    len(player.hand),
+                    tuple((meld.kind, tuple(meld.tiles), meld.open) for meld in player.melds),
+                    game.language,
+                    self.ui_scale,
+                    panel_bg,
+                )
+                if public_signature != self._last_public_tile_signatures[seat]:
+                    self._render_public_tiles(seat, player, panel_bg)
+                    self._last_public_tile_signatures[seat] = public_signature
             doras = " ".join(display_tile(dora_from_indicator(tile), game.language) for tile in list(game.dora_indicators)) or "—"
             round_name = WIND_NAMES[game.language][game.round_wind]
             self.center_label.config(
@@ -573,12 +684,6 @@ class MahjongDesktopApp:
                     f"牌山 {len(game.wall)}\n宝牌 {doras}"
                     f"\n种子 {self.active_seed}"
                 )
-            )
-            player = game.players[0]
-            self.meld_label.config(
-                text="副露: " + (" / ".join(
-                    f"{game._meld_name(m.kind)}({' '.join(display_tile(x, game.language) for x in m.tiles)})" for m in list(player.melds)
-                ) or "无")
             )
             self._render_hand()
         except (IndexError, RuntimeError, tk.TclError):
@@ -780,6 +885,7 @@ class MahjongDesktopApp:
         self.pending_kind = None
         self.recommended_tile = None
         self._public_states = None
+        self._last_public_tile_signatures = [None] * 4
         self._last_hand = ()
         self.match_complete = False
         self.abort_requested = False

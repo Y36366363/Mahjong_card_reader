@@ -2,6 +2,9 @@
 
 ## Updates 7/26/2026
 
+- Replaced opponent concealed-hand text glyphs with consistent, platform-independent tile-back widgets inspired by common digital mahjong layouts. The opposite seat fits up to 14 horizontal tiles in one row; side seats retain horizontal tiles and wrap after seven to avoid clipping.
+- Replaced textual meld summaries with grouped face-up tile widgets for every seat. Chi, pon, and kan are visually separated and a kan explicitly displays all four tiles; the existing riichi and open-hand panel highlights remain active.
+- Cached public tile-layout signatures so the desktop refresh loop rebuilds tile widgets only when a hand count, meld, language, scale, or public state actually changes.
 - Audited the scoring, configuration, match-state, desktop-adapter, and simulation paths. Corrected double-wind yakuhai so a prevailing/seat-wind triplet scores both han.
 - Corrected duplicate dora and ura-dora handling. If multiple indicators reveal the same tile, every matching tile now receives one han per indicator instead of duplicate indicators being collapsed.
 - Corrected honor-indicator cycling in ura-dora probability estimates: winds and dragons now cycle independently (`N -> E`, `C -> P`).
