@@ -7,12 +7,67 @@ from io import StringIO
 from unittest.mock import patch
 
 from game import MahjongGame
+from main import _config_bool, _ura_dora_next_idx
 from scoring import score_points_from_config
 from shanten import shanten_standard, shanten_standard_draw_state
-from tiles import index_to_tile, tiles_to_counts
+from tiles import index_to_tile, tile_to_index, tiles_to_counts
 
 
 class AdvancedAITests(unittest.TestCase):
+    def test_duplicate_dora_indicators_stack(self) -> None:
+        score = score_points_from_config(
+            hand_text="1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P",
+            win_tile_text="P",
+            win_type="ron",
+            is_dealer=False,
+            seat_wind="S",
+            round_wind="E",
+            dora_text="P P",
+        )
+        self.assertEqual(score.dora_han, 4)
+
+    def test_double_wind_triplet_is_two_yakuhai(self) -> None:
+        score = score_points_from_config(
+            hand_text="1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P",
+            win_tile_text="P",
+            win_type="ron",
+            is_dealer=True,
+            seat_wind="E",
+            round_wind="E",
+        )
+        self.assertEqual(sum(y.han_closed for y in score.yaku if y.name == "Yakuhai"), 2)
+
+    def test_honor_indicator_cycles_are_separate(self) -> None:
+        self.assertEqual(index_to_tile(_ura_dora_next_idx(tile_to_index("N"))), "E")
+        self.assertEqual(index_to_tile(_ura_dora_next_idx(tile_to_index("C"))), "P")
+
+    def test_config_boolean_parser_rejects_truthy_false_string_bug(self) -> None:
+        self.assertFalse(_config_bool("false", field_name="test"))
+        self.assertTrue(_config_bool("yes", field_name="test"))
+        with self.assertRaises(ValueError):
+            _config_bool("maybe", field_name="test")
+
+    def test_scoring_validates_winds_and_physical_tile_count(self) -> None:
+        common = dict(
+            win_tile_text="P",
+            win_type="ron",
+            is_dealer=False,
+            seat_wind="S",
+            round_wind="E",
+        )
+        with self.assertRaisesRegex(ValueError, "seat_wind"):
+            score_points_from_config(
+                hand_text="1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P",
+                **(common | {"seat_wind": "P"}),
+            )
+        with self.assertRaisesRegex(ValueError, "more than four"):
+            score_points_from_config(
+                hand_text="1m 1m 1m 1m 2p 3p 4p 2s 3s 4s E E P",
+                win_tile_text="1m",
+                win_type="ron",
+                is_dealer=False,
+            )
+
     def test_ura_dora_is_real_scoring_input_and_requires_riichi(self) -> None:
         args = dict(
             hand_text="1m 2m 3m 1p 2p 3p 1s 2s 3s E E E P",

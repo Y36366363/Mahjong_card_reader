@@ -65,10 +65,30 @@ def _tile_sort_key(tile: str) -> tuple[int, int]:
 
 
 def _ura_dora_next_idx(idx: int) -> int:
-    """Index of ura-dora tile when the indicator is tile at idx. E.g. 8m->9m, 9m->1m, E->S, C->E."""
+    """Index of dora for an indicator: suits, winds and dragons cycle separately."""
     if idx < 27:  # suited
         return (idx // 9) * 9 + (idx % 9 + 1) % 9
-    return 27 + ((idx - 27) + 1) % 7  # honors
+    if idx < 31:  # E -> S -> W -> N -> E
+        return 27 + (idx - 27 + 1) % 4
+    return 31 + (idx - 31 + 1) % 3  # P -> F -> C -> P
+
+
+def _config_bool(value: Any, *, field_name: str) -> bool:
+    """Parse booleans without treating the string ``"false"`` as truthy."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "yes", "on", "1"}:
+            return True
+        if normalized in {"false", "no", "off", "0"}:
+            return False
+    raise ValueError(
+        f"Config field '{field_name}' must be a boolean "
+        "(true/false, yes/no, on/off, or 1/0)."
+    )
 
 
 def _compute_ura_dora(hand_counts: list[int], remaining_counts: list[int], num_ura_indicators: int) -> tuple[float, float]:
@@ -355,12 +375,16 @@ def main() -> None:
         points_cfg = config.get("points", config)
         try:
             win_type = str(points_cfg.get("win_type", "tsumo")).strip().lower()
-            is_dealer = bool(points_cfg.get("is_dealer", False))
+            is_dealer = _config_bool(
+                points_cfg.get("is_dealer", False), field_name="points.is_dealer"
+            )
             win_tile = str(points_cfg.get("win_tile", "")).strip()
             dora_text = _tiles_field_to_str(points_cfg.get("dora"), field_name="dora")
-            seat_wind = str(points_cfg.get("seat_wind", "E")).strip()
-            round_wind = str(points_cfg.get("round_wind", "E")).strip()
-            riichi = bool(points_cfg.get("riichi", False))
+            seat_wind = str(points_cfg.get("seat_wind", "E")).strip().upper()
+            round_wind = str(points_cfg.get("round_wind", "E")).strip().upper()
+            riichi = _config_bool(
+                points_cfg.get("riichi", False), field_name="points.riichi"
+            )
             furo_sets = int(points_cfg.get("furo_sets", 0))
             kan_sets = int(points_cfg.get("kan_sets", 0))
             ankan_tiles = _tiles_field_to_list(points_cfg.get("ankan_tiles"), field_name="ankan_tiles")
@@ -368,7 +392,10 @@ def main() -> None:
 
             # Backward compatibility: old single-ankan fields
             if not ankan_tiles:
-                old_ankan = bool(points_cfg.get("ankan", points_cfg.get("concealed_kong", False)))
+                old_ankan = _config_bool(
+                    points_cfg.get("ankan", points_cfg.get("concealed_kong", False)),
+                    field_name="points.ankan",
+                )
                 old_ankan_tile = str(points_cfg.get("ankan_tile", points_cfg.get("concealed_kong_tile", ""))).strip()
                 if old_ankan and old_ankan_tile:
                     ankan_tiles = parse_tiles(old_ankan_tile, keep_red_fives=True)

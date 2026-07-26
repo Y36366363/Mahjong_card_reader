@@ -29,7 +29,16 @@ class SimulatedDesktopPlayer:
         self.prompts[kind] += 1
         lower = prompt.lower()
         if kind == "discard":
-            tile = str(self.game.advanced_discard_report(0)["chosen"])
+            report = self.game.last_hint_report
+            tile = (
+                str(report["chosen"])
+                if (
+                    report is not None
+                    and self.game.last_hint_hand == tuple(self.game.players[0].hand)
+                    and report.get("chosen") in self.game.players[0].hand
+                )
+                else str(self.game.advanced_discard_report(0)["chosen"])
+            )
             self.discards.append(tile)
             return tile
         if kind == "chi":

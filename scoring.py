@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 
 from points import estimate_points, estimate_yakuman_points
@@ -210,8 +211,10 @@ def _dora_han(full14_normalized: list[str], dora_tiles_raw: list[str]) -> int:
     if not dora_tiles_raw:
         return 0
     dora_norm = [red_five_to_five(t) for t in dora_tiles_raw]
-    dset = set(dora_norm)
-    return sum(1 for t in full14_normalized if t in dset)
+    # Multiple indicators may reveal the same dora. Each indicator adds one
+    # han per matching tile, so indicator multiplicity must be preserved.
+    multipliers = Counter(dora_norm)
+    return sum(multipliers[t] for t in full14_normalized)
 
 
 def _is_all_simples(full14_norm: list[str]) -> bool:
@@ -236,11 +239,16 @@ def _suits_used(full14_norm: list[str]) -> tuple[set[str], bool]:
 
 
 def _yakuhai_han(decomp: Decomposition, *, seat_wind: str, round_wind: str) -> int:
-    value_tiles = {"P", "F", "C", seat_wind, round_wind}
-    value_idxs = {TILE_INDICES[v] for v in value_tiles if v in TILE_INDICES}
     han = 0
     for m in decomp.melds:
-        if m.kind in {"pon", "kan"} and m.tiles[0] in value_idxs:
+        if m.kind not in {"pon", "kan"}:
+            continue
+        tile = index_to_tile(m.tiles[0])
+        if tile in {"P", "F", "C"}:
+            han += 1
+        if tile == seat_wind:
+            han += 1
+        if tile == round_wind:
             han += 1
     return han
 
@@ -419,6 +427,12 @@ def score_points_from_config(
     """
     if win_type not in {"tsumo", "ron"}:
         raise ValueError("win_type must be 'tsumo' or 'ron'")
+    seat_wind = seat_wind.strip().upper()
+    round_wind = round_wind.strip().upper()
+    if seat_wind not in {"E", "S", "W", "N"}:
+        raise ValueError("seat_wind must be one of E, S, W, N.")
+    if round_wind not in {"E", "S", "W", "N"}:
+        raise ValueError("round_wind must be one of E, S, W, N.")
 
     hand_raw = parse_tiles(hand_text, keep_red_fives=True)
     win_raw_list = parse_tiles(win_tile_text, keep_red_fives=True)
@@ -494,6 +508,8 @@ def score_points_from_config(
     full_counts = [0] * 34
     for t in full_norm:
         full_counts[tile_to_index(t)] += 1
+    if any(count > 4 for count in full_counts):
+        raise ValueError("A hand cannot contain more than four copies of the same tile.")
 
     dora_tiles_raw: list[str] = []
     if dora_text:

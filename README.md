@@ -1,5 +1,15 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/26/2026
+
+- Audited the scoring, configuration, match-state, desktop-adapter, and simulation paths. Corrected double-wind yakuhai so a prevailing/seat-wind triplet scores both han.
+- Corrected duplicate dora and ura-dora handling. If multiple indicators reveal the same tile, every matching tile now receives one han per indicator instead of duplicate indicators being collapsed.
+- Corrected honor-indicator cycling in ura-dora probability estimates: winds and dragons now cycle independently (`N -> E`, `C -> P`).
+- Added strict configuration boolean parsing so text such as `"false"` no longer becomes true merely because it is a non-empty string. Invalid boolean spellings now produce a useful configuration error.
+- Added score-input validation for invalid seat/round winds and physically impossible hands containing more than four copies of a tile.
+- Optimized full desktop simulations by reusing a current, hand-validated hint analysis instead of recalculating the same Advanced AI decision for the human seat.
+- Expanded regression coverage to 67 tests. Fixed-seed complete East and South matches retained 100,000 total points and exercised discard, win, riichi, chi/pon/kan, settlement, hint, tracker, river, and extension-related paths without incomplete prompts.
+
 ## Updates 7/21/2026
 
 - Added East-match and South-match selection to the desktop setup, CLI (`--match-length east|south`), JSON configuration (`game.match_length`), and desktop simulation tool.
