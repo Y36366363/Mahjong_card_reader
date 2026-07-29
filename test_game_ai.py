@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import json
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -157,6 +158,27 @@ class AdvancedAITests(unittest.TestCase):
             MahjongGame(ai_temperatures=1.1)
         with self.assertRaises(ValueError):
             MahjongGame(match_length="west")
+
+    def test_public_snapshot_is_serializable_and_hides_opponent_hands(self) -> None:
+        game = MahjongGame(seed=29, language="zh")
+        game._new_wall()
+        for _ in range(13):
+            for offset in range(4):
+                game.players[(game.dealer + offset) % 4].hand.append(game.wall.pop(0))
+        for player in game.players:
+            player.sort()
+        game.players[1].river = ["E"]
+        snapshot = game.public_snapshot(0)
+        self.assertEqual(snapshot["schema_version"], 1)
+        self.assertEqual(snapshot["players"][0]["hand"], game.players[0].hand)
+        self.assertIsNone(snapshot["players"][1]["hand"])
+        self.assertEqual(snapshot["players"][1]["concealed_count"], 13)
+        self.assertEqual(snapshot["players"][1]["river"], ["E"])
+        json.dumps(snapshot, ensure_ascii=False)
+        revealed = game.public_snapshot(0, reveal_all=True)
+        self.assertEqual(revealed["players"][2]["hand"], game.players[2].hand)
+        with self.assertRaises(ValueError):
+            game.public_snapshot(4)
 
     def test_match_length_round_progression_and_extension_threshold(self) -> None:
         east = MahjongGame(match_length="east")

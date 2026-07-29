@@ -7,6 +7,7 @@ from unittest.mock import patch
 from desktop_ui import (
     FONT_SCALES,
     GameAborted,
+    AI_LINEUP_PRESETS,
     MahjongDesktopApp,
     MATCH_LENGTH_DISPLAY_TO_ID,
     PROFILE_DISPLAY_TO_ID,
@@ -19,6 +20,7 @@ from desktop_ui import (
     display_tile,
     concealed_columns_for_seat,
     resolve_desktop_seed,
+    resolve_opponent_profiles,
     seat_wind,
     tile_grid_positions,
     valid_hint_tile,
@@ -51,6 +53,18 @@ class DesktopUIAdapterTests(unittest.TestCase):
         self.assertEqual(resolve_desktop_seed(" 20260718 "), 20260718)
         with patch("desktop_ui.secrets.randbits", return_value=987654321):
             self.assertEqual(resolve_desktop_seed(""), 987654321)
+
+    def test_three_opponents_support_presets_and_individual_profiles(self) -> None:
+        self.assertEqual(
+            AI_LINEUP_PRESETS["全部高级 / All Advanced"],
+            ("advanced_v1", "advanced_v1", "advanced_v1"),
+        )
+        self.assertEqual(
+            resolve_opponent_profiles(["Advanced AI v1", "Basic AI v1", "advanced_v1"]),
+            ["advanced_v1", "basic_v1", "advanced_v1"],
+        )
+        with self.assertRaises(ValueError):
+            resolve_opponent_profiles(["Basic AI v1"])
 
     def test_chinese_tile_labels_are_display_only(self) -> None:
         self.assertEqual(display_tile("E", "zh"), "东")

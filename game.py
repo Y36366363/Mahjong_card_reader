@@ -337,6 +337,53 @@ class MahjongGame:
     def round_wind(self) -> str:
         return WINDS[min(self.round_wind_index, 3)]
 
+    def public_snapshot(self, viewer: int = 0, *, reveal_all: bool = False) -> dict[str, object]:
+        """Return a JSON-serializable table state without leaking hidden hands.
+
+        This is the stable starting point for non-terminal clients. Desktop and
+        browser UIs can render the same public information while only the viewer's
+        concealed hand is included during normal play.
+        """
+        if viewer not in range(4):
+            raise ValueError("viewer must be a seat from 0 to 3.")
+        players: list[dict[str, object]] = []
+        for seat, player in enumerate(self.players):
+            visible_hand = reveal_all or seat == viewer
+            players.append({
+                "seat": seat,
+                "name": self._name(player),
+                "points": player.points,
+                "seat_wind": WINDS[(seat - self.dealer) % 4],
+                "dealer": seat == self.dealer,
+                "riichi": player.riichi,
+                "concealed_count": len(player.hand),
+                "hand": list(player.hand) if visible_hand else None,
+                "last_drawn_tile": player.last_drawn_tile if visible_hand else None,
+                "river": list(player.river),
+                "melds": [
+                    {"kind": meld.kind, "tiles": list(meld.tiles), "open": meld.open}
+                    for meld in player.melds
+                ],
+                "furiten": {
+                    "temporary": player.temporary_furiten,
+                    "riichi": player.riichi_furiten,
+                } if seat == viewer else None,
+            })
+        return {
+            "schema_version": 1,
+            "seed": self.seed,
+            "match_length": self.match_length,
+            "round_wind": self.round_wind,
+            "round_hand": self.round_hand,
+            "dealer": self.dealer,
+            "honba": self.honba,
+            "riichi_sticks": self.riichi_sticks,
+            "live_wall_count": len(self.wall),
+            "dora_indicators": list(self.dora_indicators),
+            "dora_tiles": [dora_from_indicator(tile) for tile in self.dora_indicators],
+            "players": players,
+        }
+
     def _round_name(self) -> str:
         names = {
             "en": {"E": "East", "S": "South", "W": "West", "N": "North"},

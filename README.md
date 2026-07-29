@@ -1,5 +1,15 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+## Updates 7/29/2026
+
+- Added independent desktop AI selection for the right, opposite, and left opponents. Quick presets provide all-Basic, all-Advanced, mixed, and custom lineups, and the selected lineup survives returning to the title screen.
+- Added the first GitHub Pages-ready browser release under `web/`. It runs without Python installation and currently provides the shanten/effective-tile assistant, persistent match settings, individual opponent profiles, and a responsive four-seat table preview.
+- Ported the standard, seven-pairs, and thirteen-orphans shanten calculations plus effective-tile enumeration to a dependency-free browser module. Browser results were checked against the Python implementation for standard, chiitoitsu, and kokushi examples.
+- Added responsive desktop/mobile styling, input validation, tile rendering, local setting persistence, and a clear in-page migration roadmap. A 390 px mobile test showed no horizontal overflow.
+- Added `.github/workflows/pages.yml`, using the official GitHub Pages Actions deployment flow. After Pages is enabled with **GitHub Actions** as its source, updates under `web/` deploy automatically from `main`.
+- Added a versioned, JSON-serializable public game snapshot containing round state, wall/dora information, scores, winds, rivers, melds, and the viewer's hand while redacting opponent concealed hands. This is the first engine-side contract for sharing one rules core across desktop and browser clients.
+- The complete match is deliberately not presented as finished in this phase: Tkinter and synchronous `input()` cannot run on GitHub Pages. The next web phase is an event/action game-engine adapter shared by desktop and browser, followed by calls, riichi, furiten, settlement, AI, and replay integration.
+
 ## Updates 7/26/2026
 
 - Replaced opponent concealed-hand text glyphs with consistent, platform-independent tile-back widgets inspired by common digital mahjong layouts. The opposite seat fits up to 14 horizontal tiles in one row; side seats retain horizontal tiles and wrap after seven to avoid clipping.
@@ -379,6 +389,36 @@ python main.py -c my_config.toml
 - Dragons: `P F C` (white/green/red)
 
 Red fives are accepted as `0m 0p 0s` and are treated as normal 5s for shanten/counting.
+
+---
+
+## Browser preview and GitHub Pages
+
+The repository now includes a dependency-free static browser release in `web/`.
+It currently provides the shanten/effective-tile assistant, saved match settings,
+individual opponent AI choices, and a responsive table preview. The complete match
+engine remains a documented next phase rather than pretending the preview is already
+the full desktop game.
+
+To publish it:
+
+1. Sync/push the repository's `main` branch to GitHub.
+2. Open the repository's **Settings → Pages**.
+3. Under **Build and deployment**, select **GitHub Actions** as the source.
+4. Run **Deploy browser preview to GitHub Pages** from the Actions tab if it did not
+   start automatically.
+5. Open `https://Y36366363.github.io/Mahjong_card_reader/`.
+
+Every later push to `main` that changes `web/` automatically republishes the page.
+The deployment workflow is `.github/workflows/pages.yml`.
+
+GitHub Pages only serves static HTML, CSS, and JavaScript, so it cannot launch
+Tkinter or a Python server. The planned full-game migration is:
+
+1. expose game snapshots, legal actions, and structured events without `input()`;
+2. make the desktop UI consume that interface;
+3. implement the same action/state contract in the browser;
+4. add calls, riichi, furiten, scoring/settlement, Advanced AI v1, and seeded replay.
 
 ---
 

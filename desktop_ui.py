@@ -29,6 +29,13 @@ TABLE_POSITIONS = {0: (2, 1), 1: (1, 2), 2: (0, 1), 3: (1, 0)}
 PROFILE_DISPLAY_TO_ID = {
     profile.display_name: profile_id for profile_id, profile in AI_PROFILES.items()
 }
+PROFILE_ID_TO_DISPLAY = {profile_id: label for label, profile_id in PROFILE_DISPLAY_TO_ID.items()}
+AI_LINEUP_PRESETS: dict[str, tuple[str, str, str] | None] = {
+    "全部初级 / All Basic": ("basic_v1", "basic_v1", "basic_v1"),
+    "全部高级 / All Advanced": ("advanced_v1", "advanced_v1", "advanced_v1"),
+    "混合强度 / Mixed": ("advanced_v1", "basic_v1", "advanced_v1"),
+    "自定义 / Custom": None,
+}
 FONT_SCALES = {"小 / Small": 0.85, "中 / Medium": 1.0, "大 / Large": 1.25}
 MATCH_LENGTH_DISPLAY_TO_ID = {"东风战 / East": "east", "南风战 / South": "south"}
 WIND_NAMES = {
@@ -100,6 +107,16 @@ def resolve_desktop_seed(seed_text: str) -> int:
 def valid_hint_tile(hand: list[str], recommendation: str | None) -> str | None:
     """Never expose a stale recommendation that is absent from the live hand."""
     return recommendation if recommendation in hand else None
+
+
+def resolve_opponent_profiles(display_values: list[str]) -> list[str]:
+    """Convert three desktop labels into stable AI profile IDs."""
+    if len(display_values) != 3:
+        raise ValueError("Exactly three opponent profiles are required.")
+    profiles = [PROFILE_DISPLAY_TO_ID.get(value, value) for value in display_values]
+    if any(profile not in AI_PROFILES for profile in profiles):
+        raise ValueError("Unknown opponent AI profile.")
+    return profiles
 
 
 def seat_wind(seat: int, dealer: int) -> str:
@@ -184,12 +201,31 @@ class MahjongDesktopApp:
         ).grid(row=1, column=0, columnspan=2, pady=(0, 26))
 
         self.language_var = tk.StringVar(value="zh")
-        self.profile_var = tk.StringVar(value=AI_PROFILES["basic_v1"].display_name)
+        self.lineup_var = tk.StringVar(value="全部初级 / All Basic")
+        self.profile_vars = [
+            tk.StringVar(value=AI_PROFILES["basic_v1"].display_name) for _ in range(3)
+        ]
+        # Kept as a compatibility alias for older UI tests/integrations.
+        self.profile_var = self.profile_vars[0]
         self.temperature_var = tk.DoubleVar(value=0.2)
         self.assist_var = tk.StringVar(value="hint")
         self.seed_var = tk.StringVar(value="")
         self.font_size_var = tk.StringVar(value="中 / Medium")
         self.match_length_var = tk.StringVar(value="东风战 / East")
+        opponent_boxes = [
+            ttk.Combobox(
+                card, textvariable=variable, state="readonly",
+                values=tuple(PROFILE_DISPLAY_TO_ID), width=24,
+            )
+            for variable in self.profile_vars
+        ]
+        for box in opponent_boxes:
+            box.bind("<<ComboboxSelected>>", self._mark_custom_lineup)
+        lineup_box = ttk.Combobox(
+            card, textvariable=self.lineup_var, state="readonly",
+            values=tuple(AI_LINEUP_PRESETS), width=24,
+        )
+        lineup_box.bind("<<ComboboxSelected>>", self._apply_lineup_preset)
         fields = [
             ("界面语言 / Language", ttk.Combobox(
                 card, textvariable=self.language_var, state="readonly",
@@ -199,10 +235,10 @@ class MahjongDesktopApp:
                 card, textvariable=self.match_length_var, state="readonly",
                 values=tuple(MATCH_LENGTH_DISPLAY_TO_ID), width=24,
             )),
-            ("电脑版本 / AI", ttk.Combobox(
-                card, textvariable=self.profile_var, state="readonly",
-                values=tuple(PROFILE_DISPLAY_TO_ID), width=24,
-            )),
+            ("电脑预设 / AI preset", lineup_box),
+            ("右家电脑 / Right AI", opponent_boxes[0]),
+            ("对家电脑 / Opposite AI", opponent_boxes[1]),
+            ("左家电脑 / Left AI", opponent_boxes[2]),
             ("提示模式 / Assist", ttk.Combobox(
                 card, textvariable=self.assist_var, state="readonly",
                 values=("hint", "normal"), width=24,
@@ -218,11 +254,12 @@ class MahjongDesktopApp:
                 row=row, column=0, sticky="w", padx=(0, 22), pady=7
             )
             widget.grid(row=row, column=1, sticky="ew", pady=7)
+        temperature_row = len(fields) + 2
         tk.Label(card, text="AI 温度 / Temperature", bg=COLORS["panel"], fg=COLORS["ink"]).grid(
-            row=8, column=0, sticky="w", padx=(0, 22), pady=7
+            row=temperature_row, column=0, sticky="w", padx=(0, 22), pady=7
         )
         temp_row = tk.Frame(card, bg=COLORS["panel"])
-        temp_row.grid(row=8, column=1, sticky="ew")
+        temp_row.grid(row=temperature_row, column=1, sticky="ew")
         ttk.Scale(temp_row, from_=0, to=1, variable=self.temperature_var).pack(
             side="left", fill="x", expand=True
         )
@@ -232,8 +269,23 @@ class MahjongDesktopApp:
             "write", lambda *_: self.temp_label.config(text=f"{self.temperature_var.get():.2f}")
         )
         ttk.Button(card, text="开始对局", style="Accent.TButton", command=self._start).grid(
-            row=9, column=0, columnspan=2, sticky="ew", pady=(28, 0)
+            row=temperature_row + 1, column=0, columnspan=2, sticky="ew", pady=(22, 0)
         )
+
+    def _apply_lineup_preset(self, _event: object | None = None) -> None:
+        preset = AI_LINEUP_PRESETS.get(self.lineup_var.get())
+        if preset is None:
+            return
+        for variable, profile_id in zip(self.profile_vars, preset):
+            variable.set(PROFILE_ID_TO_DISPLAY[profile_id])
+
+    def _mark_custom_lineup(self, _event: object | None = None) -> None:
+        selected = tuple(resolve_opponent_profiles([variable.get() for variable in self.profile_vars]))
+        for name, preset in AI_LINEUP_PRESETS.items():
+            if preset == selected:
+                self.lineup_var.set(name)
+                return
+        self.lineup_var.set("自定义 / Custom")
 
     def _apply_font_scale(self) -> None:
         scale = FONT_SCALES[self.font_size_var.get()]
@@ -368,7 +420,9 @@ class MahjongDesktopApp:
         except ValueError:
             messagebox.showerror("Invalid seed", "Seed 必须是整数或留空。")
             return
-        profile = PROFILE_DISPLAY_TO_ID.get(self.profile_var.get(), self.profile_var.get())
+        opponent_profiles = resolve_opponent_profiles(
+            [variable.get() for variable in self.profile_vars]
+        )
         match_length = MATCH_LENGTH_DISPLAY_TO_ID[self.match_length_var.get()]
         temperature = float(self.temperature_var.get())
         self._apply_font_scale()
@@ -376,7 +430,7 @@ class MahjongDesktopApp:
         self.game = MahjongGame(
             seed=seed,
             interactive=True,
-            ai_levels=["basic_v1", profile, profile, profile],
+            ai_levels=["basic_v1", *opponent_profiles],
             ai_temperatures=[0.0, temperature, temperature, temperature],
             assist_mode=self.assist_var.get(),
             language=self.language_var.get(),
@@ -874,7 +928,9 @@ class MahjongDesktopApp:
 
     def _reset_to_title(self) -> None:
         settings = {
-            "language": self.language_var.get(), "profile": self.profile_var.get(),
+            "language": self.language_var.get(),
+            "profiles": [variable.get() for variable in self.profile_vars],
+            "lineup": self.lineup_var.get(),
             "temperature": self.temperature_var.get(), "assist": self.assist_var.get(),
             "font_size": self.font_size_var.get(), "seed": self.seed_var.get(),
             "match_length": self.match_length_var.get(),
@@ -892,7 +948,9 @@ class MahjongDesktopApp:
         self.responses = queue.Queue()
         self._build_setup()
         self.language_var.set(settings["language"])
-        self.profile_var.set(settings["profile"])
+        for variable, profile in zip(self.profile_vars, settings["profiles"]):
+            variable.set(profile)
+        self.lineup_var.set(settings["lineup"])
         self.temperature_var.set(settings["temperature"])
         self.assist_var.set(settings["assist"])
         self.font_size_var.set(settings["font_size"])
