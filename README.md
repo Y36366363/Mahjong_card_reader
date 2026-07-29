@@ -409,6 +409,15 @@ To publish it:
    start automatically.
 5. Open `https://Y36366363.github.io/Mahjong_card_reader/`.
 
+### If `Configure Pages` fails with `Not Found`
+
+This means the repository's Pages site has not been enabled yet; it is not a
+problem with the `web/` files. Open **Settings → Pages**, set **Source** to
+**GitHub Actions**, save, and then run the workflow again from **Actions**.
+The workflow needs the repository-level Pages site to exist before
+`actions/configure-pages` can configure the deployment. Once this one-time
+setting is saved, later pushes to `main` deploy automatically.
+
 Every later push to `main` that changes `web/` automatically republishes the page.
 The deployment workflow is `.github/workflows/pages.yml`.
 
