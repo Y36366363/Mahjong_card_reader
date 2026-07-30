@@ -54,6 +54,11 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn("function shareSettings", app)
         self.assertIn("#settings=", app)
         self.assertIn('id="share-settings-button"', index)
+        for key in ("backgroundLabel", "backgroundAsset1", "backgroundUploaded", "backgroundHelp"):
+            self.assertGreaterEqual(app.count(key), 3, key)
+        self.assertIn('id="background-setting"', index)
+        self.assertIn('id="background-file"', index)
+        self.assertTrue((WEB / "assets" / "backgrounds" / "README.md").is_file())
 
 
 if __name__ == "__main__":

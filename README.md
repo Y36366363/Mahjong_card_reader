@@ -425,6 +425,27 @@ To publish it:
    start automatically.
 5. Open `https://Y36366363.github.io/Mahjong_card_reader/`.
 
+**Web preview:** [Open the browser assistant](https://Y36366363.github.io/Mahjong_card_reader/) · [Open match settings](https://Y36366363.github.io/Mahjong_card_reader/#settings-panel)
+
+This is a static browser entry that does not require Python. The desktop
+version still provides the complete local match and Advanced AI v1. If the
+page initially shows 404, follow the instructions below and set the Pages
+source to **GitHub Actions** under **Settings → Pages**.
+
+### Browser backgrounds
+
+The settings panel includes several built-in color themes and a local image
+picker. To add images to the public project, place these files in
+`web/assets/backgrounds/`:
+
+- `background-1.jpg`
+- `background-2.jpg`
+- `background-3.jpg`
+
+They will appear as **Project image 1/2/3** after the next Pages deployment.
+Users may also choose a local PNG/JPEG/WebP/AVIF file; that choice stays in
+their browser and is not uploaded to GitHub.
+
 ### If `Configure Pages` fails with `Not Found`
 
 This means the repository's Pages site has not been enabled yet; it is not a

@@ -116,6 +116,9 @@ textarea:focus, input:focus, select:focus { outline: 3px solid rgba(45, 102, 143
 .effective-result { margin-top: .8rem; padding: 1rem; background: #fff4d7; border-radius: 12px; line-height: 1.7; }
 .error { min-height: 1.3rem; margin: .7rem 0 0; color: var(--red); font-weight: 700; }
 .settings-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.background-upload { margin-top: 1rem; padding: .85rem 1rem; background: #f3f0e7; border: 1px dashed #c9c0a9; border-radius: 11px; }
+.background-upload small { color: var(--muted); font-weight: 500; line-height: 1.5; }
+input[type="file"] { padding: .55rem; background: transparent; border: 0; }
 output { float: right; color: var(--felt); }
 input[type="range"] { padding: 0; accent-color: var(--felt); }
 .table-section {

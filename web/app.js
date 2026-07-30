@@ -18,8 +18,23 @@ const TEXT = {
 TEXT.zh.skipToContent = "跳到主要内容";
 TEXT.en.skipToContent = "Skip to main content";
 TEXT.ja.skipToContent = "本文へ移動";
+Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "深绿牌桌", backgroundDawn: "暖色晨光", backgroundOcean: "蓝绿色", backgroundPaper: "纸张浅色", backgroundAsset1: "项目图片 1", backgroundAsset2: "项目图片 2", backgroundAsset3: "项目图片 3", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，并按 README 中的文件名命名。" });
+Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "Green felt", backgroundDawn: "Warm dawn", backgroundOcean: "Ocean teal", backgroundPaper: "Paper light", backgroundAsset1: "Project image 1", backgroundAsset2: "Project image 2", backgroundAsset3: "Project image 3", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ and use the filenames documented in README." });
+Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "緑の麻雀卓", backgroundDawn: "暖色の朝", backgroundOcean: "青緑", backgroundPaper: "紙の明るさ", backgroundAsset1: "プロジェクト画像 1", backgroundAsset2: "プロジェクト画像 2", backgroundAsset3: "プロジェクト画像 3", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置き、README のファイル名を使ってください。" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
+const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
+const BACKGROUND_ASSETS = {
+  "asset-1": "assets/backgrounds/background-1.jpg",
+  "asset-2": "assets/backgrounds/background-2.jpg",
+  "asset-3": "assets/backgrounds/background-3.jpg",
+};
+const BACKGROUND_PRESETS = {
+  felt: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
+  dawn: "radial-gradient(circle at 80% 10%, #f5c98b 0, transparent 26rem), linear-gradient(180deg, #fff1d5 0, #f9e8d9 46rem)",
+  ocean: "radial-gradient(circle at 15% 15%, #78c7c1 0, transparent 24rem), linear-gradient(180deg, #dcefee 0, #d7e2ef 46rem)",
+  paper: "linear-gradient(135deg, #fffdf7 0, #ece6d8 46rem)",
+};
 
 function applyLanguage() {
   currentLanguage = $("#language-setting").value || "zh";
@@ -33,6 +48,28 @@ function applyLanguage() {
   $$('[data-i18n-placeholder]').forEach((element) => { element.placeholder = t(element.dataset.i18nPlaceholder); });
   $("#analysis-status").textContent = t("waiting");
   renderTable();
+}
+
+function applyBackground(value) {
+  const preset = BACKGROUND_PRESETS[value];
+  if (preset) {
+    document.body.style.backgroundImage = preset;
+    document.body.style.backgroundSize = "auto";
+    return;
+  }
+  const asset = BACKGROUND_ASSETS[value];
+  if (asset) {
+    document.body.style.backgroundImage = `linear-gradient(rgba(8, 39, 31, .18), rgba(8, 39, 31, .18)), url("${asset}")`;
+    document.body.style.backgroundSize = "cover";
+    document.body.style.backgroundAttachment = "fixed";
+    return;
+  }
+  const uploaded = localStorage.getItem(BACKGROUND_STORAGE_KEY);
+  if (uploaded) {
+    document.body.style.backgroundImage = `linear-gradient(rgba(8, 39, 31, .18), rgba(8, 39, 31, .18)), url("${uploaded}")`;
+    document.body.style.backgroundSize = "cover";
+    document.body.style.backgroundAttachment = "fixed";
+  }
 }
 
 function tileLabel(tile) {
@@ -98,6 +135,7 @@ function settingsSnapshot() {
     seed: $("#seed-setting").value,
     ai: $$(".ai-setting").map((element) => element.value),
     temperature: $("#temperature-setting").value,
+    background: $("#background-setting").value,
   };
 }
 
@@ -115,6 +153,7 @@ function applySettings(saved) {
   $$(".ai-setting").forEach((element, index) => { element.value = saved.ai?.[index] || "basic_v1"; });
   const temperature = Number(saved.temperature);
   $("#temperature-setting").value = Number.isFinite(temperature) ? Math.min(1, Math.max(0, temperature)) : 0.2;
+  $("#background-setting").value = saved.background || "felt";
 }
 
 function loadSettings() {
@@ -137,6 +176,19 @@ async function shareSettings() {
   } catch {
     $("#share-status").textContent = `${t("shareUnavailable")} ${url}`;
   }
+}
+
+function handleBackgroundFile(event) {
+  const [file] = event.target.files || [];
+  if (!file || !file.type.startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    localStorage.setItem(BACKGROUND_STORAGE_KEY, String(reader.result));
+    applyBackground("uploaded");
+    $("#background-setting").value = "uploaded";
+    saveSettings();
+  });
+  reader.readAsDataURL(file);
 }
 
 function tileBacks(count) {
@@ -164,6 +216,7 @@ function renderPlayer(panel, name, wind, profile, count) {
 
 function renderTable() {
   const settings = settingsSnapshot();
+  applyBackground(settings.background);
   const profiles = ["玩家", ...settings.ai];
   const winds = currentLanguage === "en" ? ["East", "South", "West", "North"] : ["东", "南", "西", "北"];
   $$(".player").forEach((panel) => {
@@ -190,10 +243,12 @@ $("#clear-button").addEventListener("click", () => {
 });
 $("#preview-button").addEventListener("click", renderTable);
 $("#share-settings-button").addEventListener("click", shareSettings);
+$("#background-file").addEventListener("change", handleBackgroundFile);
 $$(".settings-panel input, .settings-panel select").forEach((element) => {
   const persistSetting = () => {
     saveSettings();
     if (element.id === "language-setting") applyLanguage();
+    if (element.id === "background-setting") applyBackground(element.value);
   };
   element.addEventListener("change", persistSetting);
   element.addEventListener("input", persistSetting);
