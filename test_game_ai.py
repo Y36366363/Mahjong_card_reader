@@ -318,6 +318,15 @@ class AdvancedAITests(unittest.TestCase):
         self.assertTrue(player.riichi)
         self.assertEqual(player.points, 24_000)
 
+    def test_user_gets_riichi_confirmation_for_seven_pairs_tenpai(self) -> None:
+        game = MahjongGame(interactive=True, language="zh")
+        player = game.players[0]
+        player.hand = "1m 1m 2m 2m 3m 3m 4p 4p 5p 5p 6s 6s 7s 8s".split()
+        player.sort()
+        with patch("builtins.input", side_effect=["8s", "是"]):
+            self.assertEqual(game._choose_discard(0), "8s")
+        self.assertTrue(player.riichi)
+
     def test_hint_call_analysis_is_recorded_without_mutating_stats(self) -> None:
         game = MahjongGame(interactive=True, assist_mode="hint", ai_levels=["advanced"] * 4)
         player = game.players[0]

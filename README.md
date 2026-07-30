@@ -438,11 +438,12 @@ The settings panel includes several built-in color themes and a local image
 picker. To add images to the public project, place these files in
 `web/assets/backgrounds/`:
 
-- `background-1.jpg`
-- `background-2.jpg`
-- `background-3.jpg`
+- `background-1.jpg` — 1《天才麻将少女》
+- `background-2.jpg` — 2《辉夜大小姐》
+- `background-3.jpg` — 3《Re:Zero》
 
-They will appear as **Project image 1/2/3** after the next Pages deployment.
+The browser selector uses **0 - Default**, **1 - Saki**, **2 - Kaguya-sama**,
+and **3 - Re:Zero**. The three project images appear after the next Pages deployment.
 Users may also choose a local PNG/JPEG/WebP/AVIF file; that choice stays in
 their browser and is not uploaded to GitHub.
 

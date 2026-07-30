@@ -38,6 +38,18 @@ AI_LINEUP_PRESETS: dict[str, tuple[str, str, str] | None] = {
 }
 FONT_SCALES = {"小 / Small": 0.85, "中 / Medium": 1.0, "大 / Large": 1.25}
 MATCH_LENGTH_DISPLAY_TO_ID = {"东风战 / East": "east", "南风战 / South": "south"}
+BACKGROUND_DISPLAY_TO_ID = {
+    "0 - 默认 / Default": "default",
+    "1 - 天才麻将少女 / Saki": "saki",
+    "2 - 辉夜大小姐 / Kaguya-sama": "kaguya",
+    "3 - Re:Zero": "re-zero",
+}
+BACKGROUND_COLORS = {
+    "default": ("#102d26", "#17604f"),
+    "saki": ("#241b3a", "#59427e"),
+    "kaguya": ("#3c1c28", "#8e3d4f"),
+    "re-zero": ("#17263b", "#315d78"),
+}
 WIND_NAMES = {
     "zh": {"E": "东", "S": "南", "W": "西", "N": "北"},
     "en": {"E": "East", "S": "South", "W": "West", "N": "North"},
@@ -70,6 +82,17 @@ def display_hand_order(hand: list[str], drawn: str | None) -> list[tuple[str, bo
         tiles.remove(drawn)
         return [(tile, False) for tile in tiles] + [(drawn, True)]
     return [(tile, False) for tile in tiles]
+
+
+def format_river(tiles: list[str], language: str, per_line: int = 6) -> str:
+    """Format a discard river into bounded rows so late-round tiles stay visible."""
+    if per_line < 1:
+        raise ValueError("per_line must be positive")
+    labels = [display_tile(tile, language) for tile in tiles]
+    return "\n".join(
+        " ".join(labels[start:start + per_line])
+        for start in range(0, len(labels), per_line)
+    ) or "—"
 
 
 def concealed_tile_backs(count: int, per_line: int = 7) -> str:
@@ -211,6 +234,7 @@ class MahjongDesktopApp:
         self.assist_var = tk.StringVar(value="hint")
         self.seed_var = tk.StringVar(value="")
         self.font_size_var = tk.StringVar(value="中 / Medium")
+        self.background_var = tk.StringVar(value="0 - 默认 / Default")
         self.match_length_var = tk.StringVar(value="东风战 / East")
         opponent_boxes = [
             ttk.Combobox(
@@ -226,6 +250,11 @@ class MahjongDesktopApp:
             values=tuple(AI_LINEUP_PRESETS), width=24,
         )
         lineup_box.bind("<<ComboboxSelected>>", self._apply_lineup_preset)
+        background_box = ttk.Combobox(
+            card, textvariable=self.background_var, state="readonly",
+            values=tuple(BACKGROUND_DISPLAY_TO_ID), width=24,
+        )
+        background_box.bind("<<ComboboxSelected>>", lambda _event: self._draw_setup_background())
         fields = [
             ("界面语言 / Language", ttk.Combobox(
                 card, textvariable=self.language_var, state="readonly",
@@ -247,6 +276,7 @@ class MahjongDesktopApp:
                 card, textvariable=self.font_size_var, state="readonly",
                 values=tuple(FONT_SCALES), width=24,
             )),
+            ("背景 / Background", background_box),
             ("牌山种子 / Seed（留空随机）", ttk.Entry(card, textvariable=self.seed_var, width=27)),
         ]
         for row, (label, widget) in enumerate(fields, 2):
@@ -303,14 +333,20 @@ class MahjongDesktopApp:
     def _font(self, base: int, *styles: str) -> tuple[object, ...]:
         return ("Arial", max(9, round(base * self.ui_scale)), *styles)
 
-    def _draw_setup_background(self, event: tk.Event) -> None:
+    def _draw_setup_background(self, event: tk.Event | None = None) -> None:
         """Draw a scalable, offline table-felt background behind the setup card."""
         canvas = self.setup
         canvas.delete("background")
-        w, h = event.width, event.height
-        canvas.create_rectangle(0, 0, w, h, fill="#08261f", outline="", tags="background")
+        w = event.width if event is not None else canvas.winfo_width()
+        h = event.height if event is not None else canvas.winfo_height()
+        selected = BACKGROUND_DISPLAY_TO_ID.get(
+            getattr(self, "background_var", tk.StringVar(value="0 - 默认 / Default")).get(),
+            "default",
+        )
+        outer, inner = BACKGROUND_COLORS[selected]
+        canvas.create_rectangle(0, 0, w, h, fill=outer, outline="", tags="background")
         margin = max(24, min(w, h) // 22)
-        canvas.create_rectangle(margin, margin, w - margin, h - margin, fill="#124d40",
+        canvas.create_rectangle(margin, margin, w - margin, h - margin, fill=inner,
                                 outline="#9a7130", width=5, tags="background")
         canvas.create_rectangle(margin + 11, margin + 11, w - margin - 11, h - margin - 11,
                                 outline="#315f50", width=2, tags="background")
@@ -325,13 +361,14 @@ class MahjongDesktopApp:
 
     def _build_game(self) -> None:
         self.setup.destroy()
-        self.screen = tk.Frame(self.root, bg=COLORS["bg"], padx=12, pady=12)
+        outer, inner = BACKGROUND_COLORS.get(getattr(self, "background_id", "default"), BACKGROUND_COLORS["default"])
+        self.screen = tk.Frame(self.root, bg=outer, padx=12, pady=12)
         self.screen.pack(fill="both", expand=True)
         self.screen.grid_columnconfigure(0, weight=3)
         self.screen.grid_columnconfigure(1, weight=1)
         self.screen.grid_rowconfigure(0, weight=1)
 
-        left = tk.Frame(self.screen, bg=COLORS["table"], padx=12, pady=12)
+        left = tk.Frame(self.screen, bg=inner, padx=12, pady=12)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left.grid_columnconfigure(0, weight=1)
         left.grid_columnconfigure(1, weight=2)
@@ -350,7 +387,7 @@ class MahjongDesktopApp:
             panel.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
             label = tk.Label(
                 panel, justify="left", anchor="nw", bg=COLORS["panel"], fg=COLORS["ink"],
-                font=self._font(10),
+                font=self._font(12, "bold"), wraplength=430,
             )
             label.pack(fill="x")
             concealed = tk.Frame(panel, bg=COLORS["panel"])
@@ -375,14 +412,14 @@ class MahjongDesktopApp:
             highlightbackground=COLORS["accent"], highlightthickness=3,
         )
 
-        bottom = tk.Frame(left, bg=COLORS["table"])
+        bottom = tk.Frame(left, bg=inner)
         bottom.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         self.hand_title_label = tk.Label(
-            bottom, text="当前手牌 / Your hand", bg=COLORS["table"], fg="white",
+            bottom, text="当前手牌 / Your hand", bg=inner, fg="white",
             anchor="w", font=self._font(12, "bold"),
         )
         self.hand_title_label.pack(fill="x", pady=(6, 0))
-        self.hand_frame = tk.Frame(bottom, bg=COLORS["table"])
+        self.hand_frame = tk.Frame(bottom, bg=inner)
         self.hand_frame.pack(fill="x", pady=(3, 0))
 
         right = tk.Frame(self.screen, bg=COLORS["panel"], padx=10, pady=10)
@@ -426,6 +463,9 @@ class MahjongDesktopApp:
         match_length = MATCH_LENGTH_DISPLAY_TO_ID[self.match_length_var.get()]
         temperature = float(self.temperature_var.get())
         self._apply_font_scale()
+        self.background_id = BACKGROUND_DISPLAY_TO_ID.get(
+            self.background_var.get(), "default"
+        )
         self._build_game()
         self.game = MahjongGame(
             seed=seed,
@@ -603,7 +643,7 @@ class MahjongDesktopApp:
         if back:
             return tk.Label(
                 parent, text="◆", width=2, height=1, bg="#28557b", fg="#e8cf83",
-                relief="raised", bd=2, font=self._font(9, "bold"),
+                relief="raised", bd=2, font=self._font(11, "bold"),
                 highlightbackground="#d7bd76", highlightthickness=1,
             )
         assert tile is not None
@@ -611,9 +651,9 @@ class MahjongDesktopApp:
             "m": "#b33b35", "p": "#2c63a0", "s": "#278153",
         }.get(tile[-1:] if len(tile) == 2 else "", COLORS["ink"])
         return tk.Label(
-            parent, text=display_tile(tile, language), width=3, height=1,
+            parent, text=display_tile(tile, language), width=4, height=1,
             bg=COLORS["tile"], fg=suit_color, relief="raised", bd=2,
-            font=self._font(9, "bold"),
+            font=self._font(11, "bold"),
         )
 
     def _render_public_tiles(self, seat: int, player: object, panel_bg: str) -> None:
@@ -695,7 +735,7 @@ class MahjongDesktopApp:
                     status.append("庄 / Dealer")
                 if player.riichi:
                     status.append("立直 / Riichi")
-                river = " ".join(display_tile(x, game.language) for x in list(player.river)) or "—"
+                river = format_river(list(player.river), game.language)
                 label = self.player_labels[seat]
                 panel = self.player_panels[seat]
                 if label is None or panel is None:

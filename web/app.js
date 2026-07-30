@@ -18,9 +18,9 @@ const TEXT = {
 TEXT.zh.skipToContent = "跳到主要内容";
 TEXT.en.skipToContent = "Skip to main content";
 TEXT.ja.skipToContent = "本文へ移動";
-Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "深绿牌桌", backgroundDawn: "暖色晨光", backgroundOcean: "蓝绿色", backgroundPaper: "纸张浅色", backgroundAsset1: "项目图片 1", backgroundAsset2: "项目图片 2", backgroundAsset3: "项目图片 3", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，并按 README 中的文件名命名。" });
-Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "Green felt", backgroundDawn: "Warm dawn", backgroundOcean: "Ocean teal", backgroundPaper: "Paper light", backgroundAsset1: "Project image 1", backgroundAsset2: "Project image 2", backgroundAsset3: "Project image 3", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ and use the filenames documented in README." });
-Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "緑の麻雀卓", backgroundDawn: "暖色の朝", backgroundOcean: "青緑", backgroundPaper: "紙の明るさ", backgroundAsset1: "プロジェクト画像 1", backgroundAsset2: "プロジェクト画像 2", backgroundAsset3: "プロジェクト画像 3", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置き、README のファイル名を使ってください。" });
+Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "0 - 默认", backgroundAsset1: "1 - 天才麻将少女", backgroundAsset2: "2 - 辉夜大小姐", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，对应 1/2/3 选项。" });
+Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "0 - Default", backgroundAsset1: "1 - Saki", backgroundAsset2: "2 - Kaguya-sama", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ for options 1/2/3." });
+Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "0 - デフォルト", backgroundAsset1: "1 - 咲-Saki-", backgroundAsset2: "2 - かぐや様は告らせたい", backgroundAsset3: "3 - Re:ゼロ", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置くと 1/2/3 で選べます。" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
@@ -30,10 +30,8 @@ const BACKGROUND_ASSETS = {
   "asset-3": "assets/backgrounds/background-3.jpg",
 };
 const BACKGROUND_PRESETS = {
+  default: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
   felt: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
-  dawn: "radial-gradient(circle at 80% 10%, #f5c98b 0, transparent 26rem), linear-gradient(180deg, #fff1d5 0, #f9e8d9 46rem)",
-  ocean: "radial-gradient(circle at 15% 15%, #78c7c1 0, transparent 24rem), linear-gradient(180deg, #dcefee 0, #d7e2ef 46rem)",
-  paper: "linear-gradient(135deg, #fffdf7 0, #ece6d8 46rem)",
 };
 
 function applyLanguage() {
@@ -51,6 +49,7 @@ function applyLanguage() {
 }
 
 function applyBackground(value) {
+  value = value === "felt" ? "default" : value;
   const preset = BACKGROUND_PRESETS[value];
   if (preset) {
     document.body.style.backgroundImage = preset;
@@ -153,7 +152,7 @@ function applySettings(saved) {
   $$(".ai-setting").forEach((element, index) => { element.value = saved.ai?.[index] || "basic_v1"; });
   const temperature = Number(saved.temperature);
   $("#temperature-setting").value = Number.isFinite(temperature) ? Math.min(1, Math.max(0, temperature)) : 0.2;
-  $("#background-setting").value = saved.background || "felt";
+  $("#background-setting").value = saved.background === "felt" ? "default" : (saved.background || "default");
 }
 
 function loadSettings() {

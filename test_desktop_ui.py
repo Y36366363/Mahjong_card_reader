@@ -18,6 +18,7 @@ from desktop_ui import (
     display_hand_order,
     display_text,
     display_tile,
+    format_river,
     concealed_columns_for_seat,
     resolve_desktop_seed,
     resolve_opponent_profiles,
@@ -88,6 +89,11 @@ class DesktopUIAdapterTests(unittest.TestCase):
         self.assertEqual(concealed_columns_for_seat(2), 14)
         self.assertEqual(concealed_columns_for_seat(1), 7)
         self.assertEqual(tile_grid_positions(14, 14)[-1], (0, 13))
+
+    def test_rivers_wrap_after_six_discards(self) -> None:
+        river = format_river(["1m", "2m", "3m", "4m", "5m", "6m", "7m"], "zh")
+        self.assertEqual(len(river.splitlines()), 2)
+        self.assertEqual(len(river.splitlines()[0].split()), 6)
         self.assertEqual(tile_grid_positions(13, 7)[-1], (1, 5))
         with self.assertRaises(ValueError):
             tile_grid_positions(4, 0)

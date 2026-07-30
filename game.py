@@ -9,7 +9,7 @@ from pathlib import Path
 from remaining import RemainingTileCounter
 from game_events import EventLog
 from scoring import ScoreBreakdown, score_points_from_config
-from shanten import shanten_standard, shanten_standard_draw_state
+from shanten import calculate_shanten_all, shanten_standard, shanten_standard_draw_state
 from tiles import index_to_tile, tile_to_index, tiles_to_counts
 
 
@@ -719,6 +719,14 @@ class MahjongGame:
     def _standard_shanten(self, p: PlayerState, extra: str | None = None) -> int:
         return shanten_standard(tiles_to_counts(self._full_for_analysis(p, extra)))
 
+    def _minimum_shanten(self, p: PlayerState, extra: str | None = None) -> int:
+        """Return the best legal hand-family shanten for riichi eligibility.
+
+        The discard AI can remain standard-hand focused, but riichi prompts must
+        also recognize seven-pairs and thirteen-orphans tenpai.
+        """
+        return calculate_shanten_all(self._full_for_analysis(p, extra)).minimum
+
     def _score_args(
         self, seat: int, win_tile: str, win_type: str, *, include_ura: bool = False
     ) -> dict[str, object]:
@@ -848,7 +856,9 @@ class MahjongGame:
         # Closed AI declares riichi at tenpai. This both supplies a yaku and makes
         # its later discard behaviour deterministic.
         p.hand.remove(discard)
-        can_riichi = best_shanten == 0 and p.is_closed and not p.riichi and p.points >= 1000
+        # Riichi is available for every tenpai shape, including chiitoitsu and
+        # kokushi; the discard ranking itself may still prefer standard hands.
+        can_riichi = self._minimum_shanten(p) == 0 and p.is_closed and not p.riichi and p.points >= 1000
         profile: dict[str, object] | None = None
         if can_riichi and seat == 0 and self.interactive:
             declare = self._yes_no(self._t(
@@ -890,6 +900,12 @@ class MahjongGame:
     def _shanten_after_discard(self, p: PlayerState, tile: str) -> int:
         p.hand.remove(tile)
         sh = self._standard_shanten(p)
+        p.hand.append(tile); p.sort()
+        return sh
+
+    def _minimum_shanten_after_discard(self, p: PlayerState, tile: str) -> int:
+        p.hand.remove(tile)
+        sh = self._minimum_shanten(p)
         p.hand.append(tile); p.sort()
         return sh
 
@@ -1145,10 +1161,15 @@ class MahjongGame:
 
     def _should_declare_riichi(self, seat: int, *, profile: dict[str, object] | None = None) -> bool:
         player = self.players[seat]
-        if not player.is_closed or player.points < 1000 or self._standard_shanten(player) != 0:
+        if not player.is_closed or player.points < 1000 or self._minimum_shanten(player) != 0:
             return False
         profile = profile or self._tenpai_profile(seat)
         if not profile["waits"]:
+            special = calculate_shanten_all(self._full_for_analysis(player))
+            # The generic wait profiler is standard-hand oriented.  Special
+            # tenpai (especially seven pairs) still has a valid riichi route.
+            if special.chiitoitsu == 0 or special.kokushi == 0:
+                return True
             return False
         rank = self._current_rank(seat)
         ahead, needed = self._rank_gaps(seat)
@@ -1612,7 +1633,7 @@ class MahjongGame:
             self.last_riichi_candidates = [
                 tile for tile in sorted(set(p.hand), key=tile_sort_key)
                 if p.is_closed and not p.riichi and p.points >= 1000
-                and self._shanten_after_discard(p, tile) == 0
+                and self._minimum_shanten_after_discard(p, tile) == 0
             ]
             after = self._shanten_after_discard(p, recommendation)
             visible = self._visible_counts(0)
@@ -1705,7 +1726,7 @@ class MahjongGame:
             self.last_riichi_candidates = [
                 tile for tile in sorted(set(p.hand), key=tile_sort_key)
                 if p.is_closed and not p.riichi and p.points >= 1000
-                and self._shanten_after_discard(p, tile) == 0
+                and self._minimum_shanten_after_discard(p, tile) == 0
             ]
 
     def _score_names(self, sb: ScoreBreakdown) -> list[str]:
