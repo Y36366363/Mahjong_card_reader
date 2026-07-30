@@ -11,6 +11,7 @@
 - Connected the web language selector to the visible assistant, settings, roadmap, status, and table labels for Chinese, English, and Japanese instead of only storing the choice.
 - Added shareable browser settings links. The language, match length, assist mode, seed, AI lineup, and temperature can now be encoded in a URL hash and restored when another person opens the link.
 - Added a cross-surface completeness review: the desktop calculator and local single-player match are mature, while the browser release remains a static assistant/table preview until the event-driven game engine is ported.
+- Added the first shared event/replay contract in `game_events.py` and a guarded external AI advisor interface in `ai_assistant.py`. The advisor supports OpenAI/ChatGPT-compatible APIs, DeepSeek, Gemini, and custom endpoints, reads keys only from environment variables, redacts opponent hands, and can recommend only a currently legal discard.
 
 ## Updates 7/29/2026
 
@@ -473,6 +474,19 @@ work.
 4. Add browser scoring/yaku breakdown and complete hand-context import/export.
 5. Package the desktop game for non-Python users and add save/resume, replay,
    keyboard accessibility, and visual/audio polish.
+
+### Current implementation status
+
+- **Completed in this step:** versioned JSON-safe event records, append-only
+  replay log serialization, public-snapshot event wrapping, and a provider-neutral
+  external AI recommendation interface with legal-discard validation.
+- **Not yet connected:** the existing `MahjongGame` loop still uses its tested
+  interactive compatibility adapter; the browser does not yet execute a full
+  event-driven match; external AI is not called automatically during a turn.
+- **Safety boundary:** an external model is an advisor only. It cannot see
+  concealed opponent hands, cannot bypass legal actions, and cannot directly
+  mutate points or the wall. API keys must be supplied outside the repository,
+  for example `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`.
 
 GitHub Pages only serves static HTML, CSS, and JavaScript, so it cannot launch
 Tkinter or a Python server. The planned full-game migration is:
