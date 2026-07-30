@@ -14,11 +14,12 @@ class WebReleaseTests(unittest.TestCase):
         index = (WEB / "index.html").read_text(encoding="utf-8")
         local_assets = re.findall(r'(?:href|src)="([^"]+)"', index)
         expected = {"styles.css", "app.js", "favicon.svg"}
-        self.assertTrue(expected <= set(local_assets))
+        local_asset_paths = {asset.split("?", 1)[0] for asset in local_assets}
+        self.assertTrue(expected <= local_asset_paths)
         for asset in local_assets:
             if asset.startswith(("http://", "https://", "#")):
                 continue
-            self.assertTrue((WEB / asset).is_file(), asset)
+            self.assertTrue((WEB / asset.split("?", 1)[0]).is_file(), asset)
 
     def test_browser_core_is_dependency_free_and_exposes_shanten_api(self) -> None:
         core = (WEB / "mahjong-core.mjs").read_text(encoding="utf-8")
@@ -50,6 +51,9 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn("function applyLanguage", app)
         self.assertIn("currentLanguage === \"en\"", app)
         self.assertIn("currentLanguage === \"ja\"", app)
+        self.assertIn("function shareSettings", app)
+        self.assertIn("#settings=", app)
+        self.assertIn('id="share-settings-button"', index)
 
 
 if __name__ == "__main__":

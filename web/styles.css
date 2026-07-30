@@ -89,7 +89,9 @@ textarea:focus, input:focus, select:focus { outline: 3px solid rgba(45, 102, 143
 .primary { background: var(--felt); color: white; }
 .primary:hover { background: #0f4e3f; }
 .secondary { background: #ece9df; color: var(--ink); }
-.wide { width: 100%; margin-top: 1.2rem; }
+.settings-actions { margin-top: 1.2rem; }
+.settings-actions > button { flex: 1; }
+.share-status { min-height: 1.25rem; margin: .65rem 0 0; color: var(--felt); font-size: .88rem; font-weight: 700; }
 .tile-row { display: flex; flex-wrap: wrap; gap: .3rem; min-height: 3rem; margin-top: 1.1rem; }
 .tile {
   display: inline-grid;

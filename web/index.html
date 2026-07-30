@@ -97,7 +97,11 @@
           <input id="temperature-setting" type="range" min="0" max="1" step="0.05" value="0.2">
         </label>
       </div>
-      <button id="preview-button" class="primary wide" type="button" data-i18n="preview">更新牌桌预览</button>
+      <div class="button-row settings-actions">
+        <button id="preview-button" class="primary" type="button" data-i18n="preview">更新牌桌预览</button>
+        <button id="share-settings-button" class="secondary" type="button" data-i18n="shareSettings">复制设置链接</button>
+      </div>
+      <p id="share-status" class="share-status" aria-live="polite"></p>
     </section>
 
     <section class="table-section" aria-labelledby="table-title">
@@ -145,6 +149,6 @@
     <span>Mahjong Card Reader</span>
     <a href="https://github.com/Y36366363/Mahjong_card_reader">查看 GitHub 仓库</a>
   </footer>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=20260730"></script>
 </body>
 </html>

@@ -9,6 +9,8 @@
 - Added prominent repository and browser-page links so the web assistant and its settings can be opened directly from the GitHub project homepage.
 - Added browser-page metadata and a clear hero entry point to the match settings section.
 - Connected the web language selector to the visible assistant, settings, roadmap, status, and table labels for Chinese, English, and Japanese instead of only storing the choice.
+- Added shareable browser settings links. The language, match length, assist mode, seed, AI lineup, and temperature can now be encoded in a URL hash and restored when another person opens the link.
+- Added a cross-surface completeness review: the desktop calculator and local single-player match are mature, while the browser release remains a static assistant/table preview until the event-driven game engine is ported.
 
 ## Updates 7/29/2026
 
@@ -428,8 +430,49 @@ The workflow needs the repository-level Pages site to exist before
 `actions/configure-pages` can configure the deployment. Once this one-time
 setting is saved, later pushes to `main` deploy automatically.
 
+The same error was observed again on workflow run `2` after the browser-entry
+update. It is a repository-level Pages enablement problem, not a failed browser
+test or a bad artifact path. The Settings → Pages screen must be opened while
+signed in as the repository owner; a local commit cannot create that Pages site
+without an owner-authorized token.
+
 Every later push to `main` that changes `web/` automatically republishes the page.
 The deployment workflow is `.github/workflows/pages.yml`.
+
+## Current completeness and recommended next work
+
+### Mahjong hand calculator
+
+The calculator is strong for a local utility: it supports standard, seven-pairs,
+and thirteen-orphans shanten, effective-tile enumeration, visible-tile tracking,
+Japanese/Chinese/English display, existing yaku/point calculation, red fives,
+ura-dora, and regression tests. The highest-value remaining calculator work is a
+browser scoring adapter, an explicit yaku/han/fu breakdown, and import/export of
+full hand context (melds, riichi, dora, winds) instead of only a 13/14-tile text
+input.
+
+### Simple Mahjong game
+
+The desktop version is already a usable local East/South match prototype: fixed
+seed walls, human discard/call prompts, riichi, furiten, public rivers/melds,
+ura-dora reveal timing, settlement confirmation, ranking, Basic AI v1 and
+Advanced AI v1 are covered by automated tests and fixed-seed simulations. It is
+not yet a finished consumer game: the browser does not run the complete match,
+some uncommon rules remain intentionally out of scope, and desktop packaging,
+save/resume, replay, sound, animation, and accessibility still need product
+work.
+
+### Recommended order for the next phase
+
+1. Enable and verify GitHub Pages, then keep the static browser assistant as a
+   stable public demo.
+2. Extract a shared event/action game-engine API from the desktop compatibility
+   adapter; this is the prerequisite for a real browser match.
+3. Port legal actions and settlement first (discard, chi/pon/kan, riichi,
+   ron/tsumo, furiten, round progression), then add Advanced AI v1 and replay.
+4. Add browser scoring/yaku breakdown and complete hand-context import/export.
+5. Package the desktop game for non-Python users and add save/resume, replay,
+   keyboard accessibility, and visual/audio polish.
 
 GitHub Pages only serves static HTML, CSS, and JavaScript, so it cannot launch
 Tkinter or a Python server. The planned full-game migration is:
