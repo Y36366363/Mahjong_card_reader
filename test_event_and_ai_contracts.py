@@ -1,14 +1,29 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
 from unittest.mock import patch
 
 from ai_assistant import AIProviderConfig, AIAssistantError, ExternalAIAssistant
 from game_events import EventLog, GameEvent, snapshot_event
+from game import MahjongGame
 
 
 class EventContractTests(unittest.TestCase):
+    def test_game_records_and_saves_lifecycle_events(self) -> None:
+        game = MahjongGame(seed=11, interactive=False, assist_mode="normal")
+        game.play()
+        kinds = [event.kind for event in game.event_log.events]
+        self.assertIn("match.started", kinds)
+        self.assertIn("hand.started", kinds)
+        self.assertIn("match.finished", kinds)
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "replay.json")
+            game.save_replay(path)
+            restored = MahjongGame.load_replay(path)
+        self.assertEqual(len(restored.events), len(game.event_log.events))
+
     def test_event_log_round_trips_json_and_sequences(self) -> None:
         log = EventLog()
         log.append("hand.started", {"seed": 7, "round_hand": 0})

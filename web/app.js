@@ -15,6 +15,9 @@ const TEXT = {
     heroTitle: "一人用リーチ麻雀アシスタント", heroCopy: "Python をインストールせず、ブラウザで手牌を分析し、将来の対局画面を確認できます。", openSettings: "対局設定を開く", viewProject: "GitHub プロジェクト", playableNow: "PLAYABLE NOW", assistantTitle: "シャンテン数・有効牌アシスタント", handLabel: "13 枚または 14 枚を入力", fieldHelp: "数牌: 1m–9m、1p–9p、1s–9s；字牌: E S W N P F C；赤5 0m/0p/0s 対応。", analyze: "手牌を分析", clear: "クリア", minimum: "最小シャンテン", standard: "一般形", chiitoi: "七対子", kokushi: "国士無双", matchSetup: "MATCH SETUP", settingsTitle: "ブラウザ対局設定", autosave: "自動保存", languageLabel: "言語", matchLabel: "対局長さ", eastMatch: "東風戦", southMatch: "南風戦", assistLabel: "アシスト", hintMode: "ヒントモード", normalMode: "通常モード", seedLabel: "固定シード（任意）", seedPlaceholder: "空欄 = ランダム", rightAI: "右家 AI", oppositeAI: "対面 AI", leftAI: "左家 AI", temperatureLabel: "AI 温度", preview: "卓プレビューを更新", shareSettings: "設定リンクをコピー", shareCopied: "設定リンクをコピーしました。共有できます。", shareUnavailable: "コピーできませんでした。現在のアドレスを手動でコピーしてください。", responsiveTable: "RESPONSIVE TABLE", tableTitle: "ブラウザ卓プレビュー", nextPhase: "ルールエンジンは次の段階", roadmapEntry: "ウェブ入口", roadmapEntryCopy: "静的ページ、レスポンシブ卓、設定保存、シャンテン数アシスタントを利用できます。", roadmapEngine: "構造化対局エンジン", roadmapEngineCopy: "同期 input を状態スナップショットと合法アクションに置き換え、デスクトップとウェブで共有します。", roadmapGame: "完全な一人用対局", roadmapGameCopy: "鳴き、リーチ、フリテン、精算、Advanced AI v1、シードリプレイを追加します。", waiting: "入力待ち", invalid: "入力エラー", tenpai: "テンパイ", shanten: "シャンテン", effective: "有効牌", noEffective: "シャンテン数を下げるツモはありません。", total: "合計", player: "プレイヤー", computer: "コンピューター", selfWind: "自風", round: "局", basic: "Basic AI v1", advanced: "Advanced AI v1", roundEast: "東 1 局", roundSouth: "南風戦 · 東 1 局", centerStats: "本場 0 · リーチ棒 0", wall: "山 70", dora: "ドラ —"
   },
 };
+TEXT.zh.skipToContent = "跳到主要内容";
+TEXT.en.skipToContent = "Skip to main content";
+TEXT.ja.skipToContent = "本文へ移動";
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 
@@ -50,6 +53,8 @@ function renderTiles(rawTiles) {
     const element = document.createElement("span");
     element.className = `tile ${normalized.length === 2 ? normalized[1] : "honor"}`;
     element.textContent = tileLabel(rawTile);
+    element.setAttribute("role", "img");
+    element.setAttribute("aria-label", tileLabel(rawTile));
     return element;
   }));
 }
@@ -138,11 +143,13 @@ function tileBacks(count) {
   return Array.from({ length: count }, () => {
     const back = document.createElement("span");
     back.className = "back";
+    back.setAttribute("aria-hidden", "true");
     return back;
   });
 }
 
 function renderPlayer(panel, name, wind, profile, count) {
+  panel.setAttribute("aria-label", name);
   const header = document.createElement("div");
   header.className = "player-header";
   header.innerHTML = `<span>${name}</span><span>25,000</span>`;

@@ -4,8 +4,10 @@ import random
 import re
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from remaining import RemainingTileCounter
+from game_events import EventLog
 from scoring import ScoreBreakdown, score_points_from_config
 from shanten import shanten_standard, shanten_standard_draw_state
 from tiles import index_to_tile, tile_to_index, tiles_to_counts
@@ -229,6 +231,21 @@ class MahjongGame:
         self.final_summary: dict[str, object] | None = None
         self._last_win_details: list[dict[str, object]] = []
         self._current_hand_match_ends = False
+        # Append-only local replay stream.  Existing interactive behaviour is
+        # unchanged; clients may save this stream after a match or hand.
+        self.event_log = EventLog()
+
+    def _emit_event(self, kind: str, payload: dict[str, object] | None = None) -> None:
+        self.event_log.append(kind, payload or {})
+
+    def save_replay(self, path: str | Path) -> None:
+        """Save the deterministic event stream without storing API keys."""
+        Path(path).write_text(self.event_log.to_json() + "\n", encoding="utf-8")
+
+    @staticmethod
+    def load_replay(path: str | Path) -> EventLog:
+        """Load a replay stream for inspection by desktop/browser tooling."""
+        return EventLog.from_json(Path(path).read_text(encoding="utf-8"))
 
     def _t(self, en: str, zh: str, ja: str | None = None) -> str:
         if self.language == "en":
@@ -442,6 +459,10 @@ class MahjongGame:
             print(f"{match_name}戦開始（シード={self.seed!r}；モード={mode}；{levels}）。")
         else:
             print(f"{match_name}-round game started (seed={self.seed!r}; mode={self.assist_mode}; {levels}).")
+        self._emit_event("match.started", {
+            "seed": self.seed, "match_length": self.match_length,
+            "language": self.language, "assist_mode": self.assist_mode,
+        })
         while True:
             dealer_continues = self._play_hand()
             if self._current_hand_match_ends:
@@ -501,6 +522,7 @@ class MahjongGame:
                 for rank, (seat, player) in enumerate(ranked, 1)
             ]
         }
+        self._emit_event("match.finished", {"summary": self.final_summary})
 
     def _choose_assist_mode(self) -> str:
         print(self._t("Select play mode:", "选择游戏模式："))
@@ -536,6 +558,10 @@ class MahjongGame:
 
     def _play_hand(self) -> bool:
         before = [p.points for p in self.players]
+        self._emit_event("hand.started", {
+            "round_wind": self.round_wind, "round_hand": self.round_hand,
+            "dealer": self.dealer, "honba": self.honba,
+        })
         for p in self.players:
             p.stats.hands += 1
         dealer_continues = self._play_hand_core()
@@ -543,6 +569,11 @@ class MahjongGame:
         match_ends = self._should_end_match_after_hand(dealer_continues)
         self._current_hand_match_ends = match_ends
         self._show_hand_settlement(before, dealer_continues, match_ends=match_ends)
+        self._emit_event("hand.finished", {
+            "settlement": self.last_hand_settlement,
+            "dealer_continues": dealer_continues,
+            "match_ends": match_ends,
+        })
         if self.interactive:
             input(self._t(
                 "Press Enter to view final results..." if match_ends else "Press Enter to continue to the next hand...",
@@ -565,6 +596,7 @@ class MahjongGame:
                 self.players[(self.dealer + offset) % 4].hand.append(self.wall.pop(0))
         for p in self.players:
             p.sort()
+        self._emit_event("state.snapshot", self.public_snapshot())
         if self.language == "zh":
             print(f"\n{self._round_name()}{self.round_hand + 1}局，庄家={self._name(self.players[self.dealer])}，本场={self.honba}")
             print(f"宝牌：{' '.join(dora_from_indicator(x) for x in self.dora_indicators)}")
@@ -599,6 +631,7 @@ class MahjongGame:
             discard = draw if p.riichi else self._choose_discard(turn)
             p.hand.remove(discard); p.river.append(discard)
             p.last_drawn_tile = None
+            self._emit_event("action.discard", {"seat": turn, "tile": discard})
             if turn == 0 and self.interactive:
                 print(self._t(f"You discarded {discard}.", f"你打出了 {discard}。"))
 
@@ -664,6 +697,7 @@ class MahjongGame:
             ],
             "wins": [detail.copy() for detail in self._last_win_details],
         }
+        self._emit_event("state.settlement", self.last_hand_settlement)
         print(self._t("\nHand settlement", "\n本局结算"))
         for i, p in enumerate(self.players):
             delta = p.points - before[i]
