@@ -14,6 +14,7 @@
 - Added the first shared event/replay contract in `game_events.py` and a guarded external AI advisor interface in `ai_assistant.py`. The advisor supports OpenAI/ChatGPT-compatible APIs, DeepSeek, Gemini, and custom endpoints, reads keys only from environment variables, redacts opponent hands, and can recommend only a currently legal discard.
 - Connected the event log to match start/end, hand start/deal/settlement, public snapshots, and discard actions. `MahjongGame.save_replay()` and `MahjongGame.load_replay()` now provide a local JSON replay stream without changing the interactive loop.
 - Added browser accessibility foundations: skip-to-content navigation, keyboard-visible focus rings, reduced-motion support, semantic tile labels, hidden decorative tile backs, and labelled player panels.
+- Added `.env.example` and ignored local `.env` credentials. Provider defaults are `gpt-4o-mini`, `deepseek-chat`, and `gemini-flash-latest`; API checks must be run locally and never print keys.
 
 ## Updates 7/29/2026
 

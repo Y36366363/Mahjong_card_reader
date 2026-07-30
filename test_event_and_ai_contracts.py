@@ -46,6 +46,8 @@ class EventContractTests(unittest.TestCase):
 class ExternalAIContractTests(unittest.TestCase):
     def test_provider_aliases_and_validation(self) -> None:
         self.assertEqual(AIProviderConfig("chatgpt").normalized().provider, "openai")
+        self.assertEqual(AIProviderConfig("deepseek").normalized().model, "deepseek-chat")
+        self.assertEqual(AIProviderConfig("gemini").normalized().model, "gemini-flash-latest")
         with self.assertRaises(AIAssistantError):
             AIProviderConfig("unknown").normalized()
 

@@ -24,7 +24,7 @@ class AIAssistantError(RuntimeError):
 @dataclass(frozen=True)
 class AIProviderConfig:
     provider: str = "openai"
-    model: str = "gpt-4o-mini"
+    model: str = ""
     api_key_env: str = "OPENAI_API_KEY"
     base_url: str | None = None
     timeout_seconds: float = 20.0
@@ -37,7 +37,13 @@ class AIProviderConfig:
             raise AIAssistantError("provider must be openai, deepseek, gemini, or custom.")
         if self.timeout_seconds <= 0:
             raise AIAssistantError("timeout_seconds must be positive.")
-        return AIProviderConfig(provider, self.model.strip(), self.api_key_env.strip(), self.base_url, self.timeout_seconds)
+        defaults = {
+            "openai": "gpt-4o-mini",
+            "deepseek": "deepseek-chat",
+            "gemini": "gemini-flash-latest",
+            "custom": "",
+        }
+        return AIProviderConfig(provider, self.model.strip() or defaults[provider], self.api_key_env.strip(), self.base_url, self.timeout_seconds)
 
 
 @dataclass(frozen=True)
@@ -107,7 +113,7 @@ class ExternalAIAssistant:
             )
             content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
         else:
-            model = self.config.model or "gemini-2.0-flash"
+            model = self.config.model
             base = self.config.base_url or "https://generativelanguage.googleapis.com/v1beta"
             response = self._request_json(
                 f"{base.rstrip('/')}/models/{model}:generateContent?key={key}", {},

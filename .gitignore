@@ -17,3 +17,8 @@ env/
 
 # macOS metadata
 .DS_Store
+
+# Local API credentials (never commit secrets)
+.env
+.env.*
+!.env.example
