@@ -1,5 +1,15 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
+> **浏览器版入口 / Web preview:** [立即打开网页版助手](https://Y36366363.github.io/Mahjong_card_reader/) · [打开牌局设置](https://Y36366363.github.io/Mahjong_card_reader/#settings-panel)
+
+这是一个无需安装 Python 的静态网页入口；桌面版仍提供完整的本地对局和 Advanced AI v1。首次打开若显示 404，请先按下方说明在 **Settings → Pages** 将来源设为 **GitHub Actions**。
+
+## Updates 7/30/2026
+
+- Added prominent repository and browser-page links so the web assistant and its settings can be opened directly from the GitHub project homepage.
+- Added browser-page metadata and a clear hero entry point to the match settings section.
+- Connected the web language selector to the visible assistant, settings, roadmap, status, and table labels for Chinese, English, and Japanese instead of only storing the choice.
+
 ## Updates 7/29/2026
 
 - Added independent desktop AI selection for the right, opposite, and left opponents. Quick presets provide all-Basic, all-Advanced, mixed, and custom lineups, and the selected lineup survives returning to the title screen.

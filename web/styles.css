@@ -38,6 +38,10 @@ h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: .75rem; font-size: clamp(2.2rem, 5vw, 4.5rem); letter-spacing: -.04em; }
 h2 { margin-bottom: 0; font-size: clamp(1.5rem, 3vw, 2.25rem); }
 .hero-copy { max-width: 46rem; margin-bottom: 0; color: #dcebe5; font-size: 1.1rem; line-height: 1.7; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.4rem; }
+.hero-link { display: inline-flex; align-items: center; padding: .72rem 1rem; border: 1px solid rgba(255,255,255,.35); border-radius: 10px; color: #102f27; background: #f0ce82; font-weight: 800; text-decoration: none; }
+.hero-link:hover { background: #ffe19e; }
+.hero-link.secondary-link { color: white; background: rgba(255,255,255,.1); }
 .eyebrow { margin-bottom: .45rem; color: var(--gold); font-weight: 800; font-size: .76rem; letter-spacing: .18em; }
 .phase-badge, .status {
   display: inline-flex;
@@ -168,6 +172,8 @@ footer a { color: #f0ce82; }
 @media (max-width: 600px) {
   .hero { min-height: 15rem; padding-top: 3rem; align-items: flex-start; }
   .hero > .phase-badge { display: none; }
+  .hero-actions { width: 100%; }
+  .hero-link { flex: 1; justify-content: center; text-align: center; }
   main { width: min(100% - 1rem, 1180px); }
   .panel { border-radius: 15px; }
   .settings-grid { grid-template-columns: 1fr; }

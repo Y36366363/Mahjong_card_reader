@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b322a">
+  <meta name="description" content="Mahjong Card Reader：在线分析立直麻将向听数、有效牌与牌局设置。">
+  <meta property="og:title" content="Mahjong Card Reader · 单机立直麻将助手">
+  <meta property="og:description" content="无需安装 Python，直接在浏览器中分析手牌并配置牌局。">
+  <meta property="og:type" content="website">
   <title>Mahjong Card Reader · 浏览器版</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -12,8 +16,12 @@
   <header class="hero">
     <div>
       <p class="eyebrow">MAHJONG CARD READER</p>
-      <h1>单机立直麻将助手</h1>
-      <p class="hero-copy">无需安装 Python，直接在浏览器中分析手牌并预览未来的完整对局界面。</p>
+      <h1 data-i18n="heroTitle">单机立直麻将助手</h1>
+      <p class="hero-copy" data-i18n="heroCopy">无需安装 Python，直接在浏览器中分析手牌并预览未来的完整对局界面。</p>
+      <div class="hero-actions">
+        <a class="hero-link" href="#settings-panel" data-i18n="openSettings">进入牌局设置</a>
+        <a class="hero-link secondary-link" href="https://github.com/Y36366363/Mahjong_card_reader" data-i18n="viewProject">查看 GitHub 项目</a>
+      </div>
     </div>
     <span class="phase-badge">Web Phase 1</span>
   </header>
@@ -22,83 +30,83 @@
     <section class="panel assistant-panel" aria-labelledby="assistant-title">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">PLAYABLE NOW</p>
-          <h2 id="assistant-title">向听与有效牌助手</h2>
+          <p class="eyebrow" data-i18n="playableNow">PLAYABLE NOW</p>
+          <h2 id="assistant-title" data-i18n="assistantTitle">向听与有效牌助手</h2>
         </div>
         <span id="analysis-status" class="status">等待输入</span>
       </div>
-      <label for="hand-input">输入 13 或 14 张牌</label>
+      <label for="hand-input" data-i18n="handLabel">输入 13 或 14 张牌</label>
       <textarea id="hand-input" rows="3" spellcheck="false">1m 2m 3m 4m 5m 6m 2p 3p 4p 6s 7s E E</textarea>
-      <p class="field-help">万子 1m–9m、筒子 1p–9p、索子 1s–9s；字牌 E S W N P F C；支持赤五 0m/0p/0s。</p>
+      <p class="field-help" data-i18n="fieldHelp">万子 1m–9m、筒子 1p–9p、索子 1s–9s；字牌 E S W N P F C；支持赤五 0m/0p/0s。</p>
       <div class="button-row">
-        <button id="analyze-button" class="primary" type="button">开始分析</button>
-        <button id="clear-button" class="secondary" type="button">清空</button>
+        <button id="analyze-button" class="primary" type="button" data-i18n="analyze">开始分析</button>
+        <button id="clear-button" class="secondary" type="button" data-i18n="clear">清空</button>
       </div>
       <div id="hand-tiles" class="tile-row" aria-live="polite"></div>
       <div id="analysis-result" class="result-grid" hidden>
-        <article><span>综合向听</span><strong id="minimum-result">—</strong></article>
-        <article><span>一般型</span><strong id="standard-result">—</strong></article>
-        <article><span>七对子</span><strong id="chiitoi-result">—</strong></article>
-        <article><span>国士无双</span><strong id="kokushi-result">—</strong></article>
+        <article><span data-i18n="minimum">综合向听</span><strong id="minimum-result">—</strong></article>
+        <article><span data-i18n="standard">一般型</span><strong id="standard-result">—</strong></article>
+        <article><span data-i18n="chiitoi">七对子</span><strong id="chiitoi-result">—</strong></article>
+        <article><span data-i18n="kokushi">国士无双</span><strong id="kokushi-result">—</strong></article>
       </div>
       <div id="effective-result" class="effective-result" hidden></div>
       <p id="analysis-error" class="error" role="alert"></p>
     </section>
 
-    <section class="panel settings-panel" aria-labelledby="settings-title">
+    <section id="settings-panel" class="panel settings-panel" aria-labelledby="settings-title">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">MATCH SETUP</p>
-          <h2 id="settings-title">未来网页版对局设置</h2>
+          <p class="eyebrow" data-i18n="matchSetup">MATCH SETUP</p>
+          <h2 id="settings-title" data-i18n="settingsTitle">未来网页版对局设置</h2>
         </div>
-        <span class="status muted">自动保存</span>
+        <span class="status muted" data-i18n="autosave">自动保存</span>
       </div>
       <div class="settings-grid">
-        <label>语言
+        <label><span data-i18n="languageLabel">语言</span>
           <select id="language-setting">
             <option value="zh">中文</option>
             <option value="en">English</option>
             <option value="ja">日本語</option>
           </select>
         </label>
-        <label>对局长度
+        <label><span data-i18n="matchLabel">对局长度</span>
           <select id="match-setting">
-            <option value="east">东风战</option>
-            <option value="south">南风战</option>
+            <option value="east" data-i18n="eastMatch">东风战</option>
+            <option value="south" data-i18n="southMatch">南风战</option>
           </select>
         </label>
-        <label>辅助模式
+        <label><span data-i18n="assistLabel">辅助模式</span>
           <select id="assist-setting">
-            <option value="hint">提示模式</option>
-            <option value="normal">普通模式</option>
+            <option value="hint" data-i18n="hintMode">提示模式</option>
+            <option value="normal" data-i18n="normalMode">普通模式</option>
           </select>
         </label>
-        <label>固定种子（可选）
-          <input id="seed-setting" type="number" inputmode="numeric" placeholder="留空则随机">
+        <label><span data-i18n="seedLabel">固定种子（可选）</span>
+          <input id="seed-setting" type="number" inputmode="numeric" placeholder="留空则随机" data-i18n-placeholder="seedPlaceholder">
         </label>
-        <label>右家电脑
+        <label><span data-i18n="rightAI">右家电脑</span>
           <select id="right-ai-setting" class="ai-setting"><option value="basic_v1">Basic AI v1</option><option value="advanced_v1">Advanced AI v1</option></select>
         </label>
-        <label>对家电脑
+        <label><span data-i18n="oppositeAI">对家电脑</span>
           <select id="opposite-ai-setting" class="ai-setting"><option value="basic_v1">Basic AI v1</option><option value="advanced_v1">Advanced AI v1</option></select>
         </label>
-        <label>左家电脑
+        <label><span data-i18n="leftAI">左家电脑</span>
           <select id="left-ai-setting" class="ai-setting"><option value="basic_v1">Basic AI v1</option><option value="advanced_v1">Advanced AI v1</option></select>
         </label>
-        <label>AI 温度 <output id="temperature-output">0.20</output>
+        <label><span data-i18n="temperatureLabel">AI 温度</span> <output id="temperature-output">0.20</output>
           <input id="temperature-setting" type="range" min="0" max="1" step="0.05" value="0.2">
         </label>
       </div>
-      <button id="preview-button" class="primary wide" type="button">更新牌桌预览</button>
+      <button id="preview-button" class="primary wide" type="button" data-i18n="preview">更新牌桌预览</button>
     </section>
 
     <section class="table-section" aria-labelledby="table-title">
       <div class="section-heading light">
         <div>
-          <p class="eyebrow">RESPONSIVE TABLE</p>
-          <h2 id="table-title">网页版牌桌预览</h2>
+          <p class="eyebrow" data-i18n="responsiveTable">RESPONSIVE TABLE</p>
+          <h2 id="table-title" data-i18n="tableTitle">网页版牌桌预览</h2>
         </div>
-        <span class="phase-badge subdued">规则状态机下一阶段接入</span>
+        <span class="phase-badge subdued" data-i18n="nextPhase">规则状态机下一阶段接入</span>
       </div>
       <div class="mahjong-table">
         <article class="player opposite" data-seat="2"></article>
@@ -117,18 +125,18 @@
     <section class="roadmap">
       <article>
         <span class="step complete">1</span>
-        <h3>网页入口</h3>
-        <p>静态页面、响应式牌桌、设置保存与向听助手已经可部署。</p>
+        <h3 data-i18n="roadmapEntry">网页入口</h3>
+        <p data-i18n="roadmapEntryCopy">静态页面、响应式牌桌、设置保存与向听助手已经可部署。</p>
       </article>
       <article>
         <span class="step">2</span>
-        <h3>结构化牌局引擎</h3>
-        <p>把同步 input 提示改为状态快照与合法行动，供桌面和网页共同调用。</p>
+        <h3 data-i18n="roadmapEngine">结构化牌局引擎</h3>
+        <p data-i18n="roadmapEngineCopy">把同步 input 提示改为状态快照与合法行动，供桌面和网页共同调用。</p>
       </article>
       <article>
         <span class="step">3</span>
-        <h3>完整单机对局</h3>
-        <p>接入吃碰杠、立直、振听、结算、Advanced AI v1 和回放种子。</p>
+        <h3 data-i18n="roadmapGame">完整单机对局</h3>
+        <p data-i18n="roadmapGameCopy">接入吃碰杠、立直、振听、结算、Advanced AI v1 和回放种子。</p>
       </article>
     </section>
   </main>

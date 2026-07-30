@@ -38,6 +38,19 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn("node web/test-core.mjs", workflow)
         self.assertRegex(workflow, r"path:\s*web")
 
+    def test_public_entry_links_and_language_catalog_are_present(self) -> None:
+        index = (WEB / "index.html").read_text(encoding="utf-8")
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        pages_url = "https://Y36366363.github.io/Mahjong_card_reader/"
+        self.assertIn(f"({pages_url}#settings-panel)", readme)
+        self.assertIn('href="#settings-panel"', index)
+        self.assertIn('value="en"', index)
+        self.assertIn('value="ja"', index)
+        self.assertIn("function applyLanguage", app)
+        self.assertIn("currentLanguage === \"en\"", app)
+        self.assertIn("currentLanguage === \"ja\"", app)
+
 
 if __name__ == "__main__":
     unittest.main()
