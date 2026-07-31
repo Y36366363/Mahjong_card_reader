@@ -411,10 +411,11 @@ Red fives are accepted as `0m 0p 0s` and are treated as normal 5s for shanten/co
 ## Browser preview and GitHub Pages
 
 The repository now includes a dependency-free static browser release in `web/`.
-It currently provides the shanten/effective-tile assistant, saved match settings,
-individual opponent AI choices, and a responsive table preview. The complete match
-engine remains a documented next phase rather than pretending the preview is already
-the full desktop game.
+It provides the shanten/effective-tile assistant, saved match settings, individual
+opponent AI choices, a responsive table preview, and an experimental seeded browser
+match slice with Basic AI opponents. The complete scoring/call/rule set remains a
+documented next phase rather than pretending this first browser slice is already the
+full desktop game.
 
 To publish it:
 
@@ -504,12 +505,15 @@ work.
 
 ### Current implementation status
 
-- **Completed in this step:** versioned JSON-safe event records, append-only
-  replay log serialization, public-snapshot event wrapping, and a provider-neutral
-  external AI recommendation interface with legal-discard validation.
-- **Not yet connected:** the existing `MahjongGame` loop still uses its tested
-  interactive compatibility adapter; the browser does not yet execute a full
-  event-driven match; external AI is not called automatically during a turn.
+- **Completed:** versioned JSON-safe event records, append-only replay log
+  serialization, public-snapshot event wrapping, a provider-neutral external AI
+  recommendation interface with legal-discard validation, and a browser Phase 1
+  seeded action loop. The browser loop deals a fixed wall, lets the player discard,
+  runs three Basic AI discard turns, exposes public rivers, and supports JSON save/load.
+- **Still being connected:** the existing `MahjongGame` loop still uses its tested
+  interactive compatibility adapter; browser calls, win detection, scoring,
+  settlement, and Advanced AI are not yet connected. External AI is not called
+  automatically during a turn.
 - **Safety boundary:** an external model is an advisor only. It cannot see
   concealed opponent hands, cannot bypass legal actions, and cannot directly
   mutate points or the wall. API keys must be supplied outside the repository,

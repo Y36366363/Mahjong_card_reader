@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { calculateShanten, effectiveTiles, parseTiles } from "./mahjong-core.mjs";
+import { BrowserMatch } from "./game-engine.mjs";
 
 const cases = [
   ["1m 2m 3m 4m 5m 6m 2p 3p 4p 6s 7s E E", [0, 5, 10]],
@@ -27,4 +28,16 @@ assert.throws(
   /超过四张/,
 );
 
-console.log("Browser shanten core tests passed.");
+const match = new BrowserMatch({ seed: 20260731 });
+assert.equal(match.publicSnapshot().players[0].hand.length, 14);
+assert.equal(match.publicSnapshot().live_wall_count, 83);
+const before = match.events.length;
+const discard = match.legalDiscards()[0];
+match.discard(discard);
+assert.ok(match.events.length > before);
+assert.equal(match.publicSnapshot().players[0].river.length, 1);
+const restored = BrowserMatch.fromJSON(match.save());
+assert.deepEqual(restored.publicSnapshot(), match.publicSnapshot());
+assert.equal(restored.events.length, match.events.length);
+
+console.log("Browser shanten and match engine tests passed.");

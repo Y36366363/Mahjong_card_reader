@@ -140,6 +140,26 @@
       </div>
     </section>
 
+    <section class="panel browser-match-panel" aria-labelledby="browser-game-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">BROWSER GAME · PHASE 1</p>
+          <h2 id="browser-game-title" data-i18n="browserGameTitle">浏览器牌局（实验阶段）</h2>
+          <p class="field-help" data-i18n="browserGameCopy">使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。</p>
+        </div>
+        <span id="browser-match-status" class="status muted" data-i18n="browserNoGame">尚未开始牌局</span>
+      </div>
+      <div class="button-row browser-match-actions">
+        <button id="browser-start-button" class="primary" type="button" data-i18n="browserStart">开始浏览器牌局</button>
+        <button id="browser-save-button" class="secondary" type="button" data-i18n="browserSave">下载存档</button>
+        <label class="file-button secondary"><span data-i18n="browserLoad">读取存档</span><input id="browser-load-input" type="file" accept="application/json"></label>
+      </div>
+      <h3 data-i18n="browserHand">你的手牌</h3>
+      <div id="browser-hand" class="browser-hand" aria-live="polite"></div>
+      <h3 data-i18n="browserRiver">牌河</h3>
+      <div id="browser-rivers" class="browser-rivers" aria-live="polite"></div>
+    </section>
+
     <section class="roadmap">
       <article>
         <span class="step complete">1</span>

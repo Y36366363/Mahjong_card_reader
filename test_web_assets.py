@@ -28,6 +28,8 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn("export function calculateShanten", core)
         self.assertIn("export function effectiveTiles", core)
         self.assertIn('from "./mahjong-core.mjs"', app)
+        self.assertIn('from "./game-engine.mjs"', app)
+        self.assertTrue((WEB / "game-engine.mjs").is_file())
 
     def test_pages_workflow_deploys_the_web_directory(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(
@@ -59,6 +61,8 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn('id="background-setting"', index)
         self.assertIn('id="background-file"', index)
         self.assertIn('id="analysis-status" class="status" data-i18n="waiting"', index)
+        for element_id in ("browser-start-button", "browser-save-button", "browser-load-input", "browser-hand"):
+            self.assertIn(f'id="{element_id}"', index)
         self.assertTrue((WEB / "assets" / "backgrounds" / "README.md").is_file())
         for number in (1, 2, 3):
             self.assertTrue((WEB / "assets" / "backgrounds" / f"background-{number}.jpg").is_file())

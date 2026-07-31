@@ -1,4 +1,5 @@
 import { calculateShanten, effectiveTiles, parseTiles } from "./mahjong-core.mjs";
+import { BrowserMatch } from "./game-engine.mjs";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -21,6 +22,9 @@ TEXT.ja.skipToContent = "本文へ移動";
 Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "0 - 默认", backgroundAsset1: "1 - 天才麻将少女", backgroundAsset2: "2 - 辉夜大小姐", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，对应 1/2/3 选项。" });
 Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "0 - Default", backgroundAsset1: "1 - Saki", backgroundAsset2: "2 - Kaguya-sama", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ for options 1/2/3." });
 Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "0 - デフォルト", backgroundAsset1: "1 - 咲-Saki-", backgroundAsset2: "2 - かぐや様は告らせたい", backgroundAsset3: "3 - Re:ゼロ", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置くと 1/2/3 で選べます。" });
+Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河" });
+Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match; the other three seats currently use Basic AI v1.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River" });
+Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局を開始します。他の3席は現在 Basic AI v1 です。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
@@ -33,6 +37,8 @@ const BACKGROUND_PRESETS = {
   default: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
   felt: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
 };
+const BROWSER_SAVE_KEY = "mahjong-card-reader-browser-match-v1";
+let browserMatch = null;
 
 function applyLanguage() {
   currentLanguage = $("#language-setting").value || "zh";
@@ -208,6 +214,79 @@ function tileBacks(count) {
   });
 }
 
+function browserTileButton(tile, index) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "browser-tile-button tile";
+  button.textContent = tileLabel(tile);
+  button.setAttribute("aria-label", `${t("browserDiscard")}: ${tileLabel(tile)}`);
+  button.addEventListener("click", () => {
+    try {
+      browserMatch.discard(index);
+      localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
+      renderBrowserMatch();
+    } catch (error) {
+      $("#browser-match-status").textContent = error instanceof Error ? error.message : String(error);
+    }
+  });
+  return button;
+}
+
+function renderBrowserMatch() {
+  const status = $("#browser-match-status");
+  const hand = $("#browser-hand");
+  const rivers = $("#browser-rivers");
+  if (!browserMatch) {
+    status.textContent = t("browserNoGame");
+    hand.replaceChildren();
+    rivers.replaceChildren();
+    return;
+  }
+  const snapshot = browserMatch.publicSnapshot();
+  status.textContent = `${t("browserStatus")} · ${snapshot.phase} · ${t("wall")} ${snapshot.live_wall_count} · ${t("browserDiscard")}`;
+  hand.replaceChildren(...snapshot.players[0].hand.map((tile, index) => browserTileButton(tile, index)));
+  rivers.replaceChildren(...snapshot.players.slice(1).map((player) => {
+    const row = document.createElement("div");
+    row.className = "browser-river-row";
+    row.textContent = `${player.name}: ${player.river.map(tileLabel).join(" ") || "—"}`;
+    return row;
+  }));
+}
+
+function startBrowserMatch() {
+  browserMatch = new BrowserMatch({ seed: $("#seed-setting").value });
+  localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
+  renderBrowserMatch();
+}
+
+function downloadBrowserSave() {
+  if (!browserMatch) return;
+  const blob = new Blob([browserMatch.save()], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `mahjong-browser-${browserMatch.seed}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  $("#browser-match-status").textContent = t("browserSaved");
+}
+
+function loadBrowserSave(event) {
+  const [file] = event.target.files || [];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      browserMatch = BrowserMatch.fromJSON(String(reader.result));
+      localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
+      renderBrowserMatch();
+      $("#browser-match-status").textContent = t("browserLoaded");
+    } catch (error) {
+      $("#browser-match-status").textContent = error instanceof Error ? error.message : String(error);
+    }
+  });
+  reader.readAsText(file);
+}
+
 function renderPlayer(panel, name, wind, profile, count) {
   panel.setAttribute("aria-label", name);
   const header = document.createElement("div");
@@ -237,6 +316,7 @@ function renderTable() {
   centerLines[1].textContent = t("wall");
   centerLines[2].textContent = t("dora");
   saveSettings();
+  renderBrowserMatch();
 }
 
 $("#analyze-button").addEventListener("click", analyze);
@@ -251,6 +331,15 @@ $("#clear-button").addEventListener("click", () => {
 $("#preview-button").addEventListener("click", renderTable);
 $("#share-settings-button").addEventListener("click", shareSettings);
 $("#background-file").addEventListener("change", handleBackgroundFile);
+$("#browser-start-button").addEventListener("click", startBrowserMatch);
+$("#browser-save-button").addEventListener("click", downloadBrowserSave);
+$("#browser-load-input").addEventListener("change", loadBrowserSave);
+try {
+  const savedBrowserMatch = localStorage.getItem(BROWSER_SAVE_KEY);
+  if (savedBrowserMatch) browserMatch = BrowserMatch.fromJSON(savedBrowserMatch);
+} catch {
+  localStorage.removeItem(BROWSER_SAVE_KEY);
+}
 $$(".settings-panel input, .settings-panel select").forEach((element) => {
   const persistSetting = () => {
     saveSettings();
