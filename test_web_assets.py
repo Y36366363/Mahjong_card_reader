@@ -58,6 +58,7 @@ class WebReleaseTests(unittest.TestCase):
             self.assertGreaterEqual(app.count(key), 3, key)
         self.assertIn('id="background-setting"', index)
         self.assertIn('id="background-file"', index)
+        self.assertIn('id="analysis-status" class="status" data-i18n="waiting"', index)
         self.assertTrue((WEB / "assets" / "backgrounds" / "README.md").is_file())
         for number in (1, 2, 3):
             self.assertTrue((WEB / "assets" / "backgrounds" / f"background-{number}.jpg").is_file())

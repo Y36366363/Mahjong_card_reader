@@ -246,7 +246,6 @@ $("#clear-button").addEventListener("click", () => {
   $("#analysis-result").hidden = true;
   $("#effective-result").hidden = true;
   $("#analysis-error").textContent = "";
-  $("#analysis-status").textContent = "等待输入";
   $("#analysis-status").textContent = t("waiting");
 });
 $("#preview-button").addEventListener("click", renderTable);
