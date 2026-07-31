@@ -59,6 +59,9 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn('id="background-setting"', index)
         self.assertIn('id="background-file"', index)
         self.assertTrue((WEB / "assets" / "backgrounds" / "README.md").is_file())
+        for number in (1, 2, 3):
+            self.assertTrue((WEB / "assets" / "backgrounds" / f"background-{number}.jpg").is_file())
+            self.assertTrue((WEB / "assets" / "backgrounds" / f"background-{number}.png").is_file())
 
 
 if __name__ == "__main__":

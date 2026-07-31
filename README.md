@@ -444,6 +444,8 @@ picker. To add images to the public project, place these files in
 
 The browser selector uses **0 - Default**, **1 - Saki**, **2 - Kaguya-sama**,
 and **3 - Re:Zero**. The three project images appear after the next Pages deployment.
+The desktop setup screen uses the matching `.png` companions in the same folder
+so the selected artwork is rendered as an actual background image.
 Users may also choose a local PNG/JPEG/WebP/AVIF file; that choice stays in
 their browser and is not uploaded to GitHub.
 

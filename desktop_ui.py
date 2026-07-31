@@ -50,6 +50,11 @@ BACKGROUND_COLORS = {
     "kaguya": ("#3c1c28", "#8e3d4f"),
     "re-zero": ("#17263b", "#315d78"),
 }
+BACKGROUND_IMAGE_FILES = {
+    "saki": "web/assets/backgrounds/background-1.png",
+    "kaguya": "web/assets/backgrounds/background-2.png",
+    "re-zero": "web/assets/backgrounds/background-3.png",
+}
 WIND_NAMES = {
     "zh": {"E": "东", "S": "南", "W": "西", "N": "北"},
     "en": {"E": "East", "S": "South", "W": "West", "N": "North"},
@@ -194,6 +199,7 @@ class MahjongDesktopApp:
         self.abort_requested = False
         self.match_complete = False
         self.ui_scale = 1.0
+        self.background_images: dict[str, tk.PhotoImage] = {}
         self._configure_style()
         self._build_setup()
         self.root.after(80, self._poll)
@@ -212,6 +218,7 @@ class MahjongDesktopApp:
         self.setup = tk.Canvas(self.root, bg=COLORS["bg"], highlightthickness=0)
         self.setup.pack(fill="both", expand=True)
         self.setup.bind("<Configure>", self._draw_setup_background)
+        self._load_background_images()
         card = tk.Frame(self.setup, bg=COLORS["panel"], padx=42, pady=34)
         self.setup_card_window = self.setup.create_window(640, 410, window=card, anchor="center")
         tk.Label(
@@ -356,8 +363,22 @@ class MahjongDesktopApp:
                                width=2, tags="background")
             canvas.create_text(x, y, text="麻", fill="#d5b667", font=("Arial", 15, "bold"),
                                tags="background")
+        image = self.background_images.get(selected)
+        if image is not None:
+            canvas.create_image(w / 2, h / 2, image=image, anchor="center", tags="background")
         canvas.tag_lower("background")
         canvas.coords(self.setup_card_window, w / 2, h / 2)
+
+    def _load_background_images(self) -> None:
+        """Load PNG companions for desktop, with a safe color fallback."""
+        for name, relative_path in BACKGROUND_IMAGE_FILES.items():
+            path = Path(__file__).resolve().parent / relative_path
+            if not path.is_file():
+                continue
+            try:
+                self.background_images[name] = tk.PhotoImage(file=str(path))
+            except tk.TclError:
+                continue
 
     def _build_game(self) -> None:
         self.setup.destroy()

@@ -50,6 +50,10 @@ function applyLanguage() {
 
 function applyBackground(value) {
   value = value === "felt" ? "default" : value;
+  if (!BACKGROUND_PRESETS[value] && !BACKGROUND_ASSETS[value] && value !== "uploaded") {
+    value = "default";
+  }
+  document.body.style.backgroundAttachment = "scroll";
   const preset = BACKGROUND_PRESETS[value];
   if (preset) {
     document.body.style.backgroundImage = preset;
@@ -68,7 +72,10 @@ function applyBackground(value) {
     document.body.style.backgroundImage = `linear-gradient(rgba(8, 39, 31, .18), rgba(8, 39, 31, .18)), url("${uploaded}")`;
     document.body.style.backgroundSize = "cover";
     document.body.style.backgroundAttachment = "fixed";
+    return;
   }
+  document.body.style.backgroundImage = BACKGROUND_PRESETS.default;
+  document.body.style.backgroundSize = "auto";
 }
 
 function tileLabel(tile) {
@@ -152,7 +159,9 @@ function applySettings(saved) {
   $$(".ai-setting").forEach((element, index) => { element.value = saved.ai?.[index] || "basic_v1"; });
   const temperature = Number(saved.temperature);
   $("#temperature-setting").value = Number.isFinite(temperature) ? Math.min(1, Math.max(0, temperature)) : 0.2;
-  $("#background-setting").value = saved.background === "felt" ? "default" : (saved.background || "default");
+  const savedBackground = saved.background === "felt" ? "default" : saved.background;
+  $("#background-setting").value = ["default", "asset-1", "asset-2", "asset-3", "uploaded"].includes(savedBackground)
+    ? savedBackground : "default";
 }
 
 function loadSettings() {
