@@ -207,6 +207,37 @@ export class BrowserMatch {
     return options;
   }
 
+  _aiCallOptions(seat, tile, discarder) {
+    const hand = this.players[seat].hand;
+    const count = hand.filter((candidate) => candidate === tile).length;
+    const options = [];
+    if (count >= 2) options.push("pon");
+    if (count >= 3) options.push("kan");
+    if (discarder === (seat + 3) % 4 && TILE_INDEX.get(tile) < 27) options.push("chi");
+    return options;
+  }
+
+  _resolveAICall(tile, discarder) {
+    for (let seat = 1; seat < 4; seat += 1) {
+      const options = this._aiCallOptions(seat, tile, discarder);
+      if (!options.length) continue;
+      const player = this.players[seat];
+      const profile = this.ai[seat - 1] || "basic_v1";
+      const isValueHonor = TILE_INDEX.get(tile) >= 27;
+      const action = profile === "advanced_v1"
+        ? (isValueHonor && options.includes("pon") ? "pon" : null)
+        : (isValueHonor && options.includes("pon") ? "pon" : null);
+      if (!action) continue;
+      const needed = action === "pon" ? [tile, tile] : [tile, tile, tile];
+      if (!needed.every((candidate) => player.hand.includes(candidate))) continue;
+      for (const candidate of needed) player.hand.splice(player.hand.indexOf(candidate), 1);
+      player.melds.push({ kind: action, tiles: [tile, ...needed], open: true });
+      this._emit("action.call", { seat, kind: action, tile, discarder, ai: profile });
+      return true;
+    }
+    return false;
+  }
+
   discard(tileOrIndex) {
     if (this.phase !== "player-discard") throw new Error("现在不是玩家出牌阶段。");
     const player = this.players[0];
@@ -262,6 +293,7 @@ export class BrowserMatch {
         this.pending = { type: "discard", seat: 0, options: this.legalDiscards() };
         this._emit("action.call", { seat: 0, kind, tile, discarder: pending.discarder });
       } else {
+        this._resolveAICall(pending.tile, pending.discarder);
         this._continueOpponents();
       }
     } else if (pending.type === "next_hand") {
@@ -290,7 +322,7 @@ export class BrowserMatch {
       points = score.tsumo_child;
       for (const player of this.players) {
         if (player.seat === winner) continue;
-        const payment = player.seat === 0 ? score.tsumo_dealer : score.tsumo_child;
+        const payment = player.seat === this.dealer ? score.tsumo_dealer : score.tsumo_child;
         player.points -= payment;
         this.players[winner].points += payment;
       }

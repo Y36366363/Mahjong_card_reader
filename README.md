@@ -230,7 +230,16 @@ manual and cannot perform an action automatically.
 PyInstaller builds are defined in `mahjong_card_reader.spec` and the
 `desktop-build.yml` workflow. GitHub Actions produces separate Linux, Windows,
 and macOS artifacts for a release tag or a manual workflow dispatch; actual
-platform artifacts must still be smoke-tested on each target OS.
+platform artifacts must still be smoke-tested on each target OS. A macOS arm64
+build has now been generated and code-signature verified locally; build outputs
+remain ignored by Git and are not committed.
+
+The browser scorer now shares the desktop scorer's core conventions for red
+fives, indicator-based dora/ura-dora, yakuhai, tanyao, honitsu/chinitsu,
+toitoi, ittsu, sanshoku, chanta, riichi, menzen tsumo, chiitoitsu and kokushi.
+It is still deliberately smaller than the desktop scorer's exhaustive
+decomposition (for example, every rare yakuman and every wait-specific fu
+combination should be parity-tested before tournament use).
 
 ## East/South match simulation
 

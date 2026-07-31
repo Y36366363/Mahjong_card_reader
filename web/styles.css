@@ -110,6 +110,11 @@ textarea:focus, input:focus, select:focus { outline: 3px solid rgba(45, 102, 143
 .browser-replay summary { cursor: pointer; font-weight: 800; }
 .browser-replay-list { max-height: 14rem; overflow: auto; margin-bottom: 0; padding: .75rem 1.75rem; background: #f5f2e9; border-radius: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; line-height: 1.55; }
 .browser-replay-state { margin: .75rem 0 0; padding: .7rem; background: #eef5f1; border-radius: 8px; font-size: .9rem; }
+.browser-replay-table { display: grid; gap: .55rem; margin-top: .75rem; padding: .75rem; background: #f7f4ec; border-radius: 10px; }
+.replay-player-row { display: grid; grid-template-columns: minmax(7rem, 12rem) 1fr; gap: .35rem .7rem; align-items: center; }
+.replay-player-row small { grid-column: 2; color: #56635f; }
+.replay-row-tiles { display: flex; flex-wrap: wrap; gap: .18rem; }
+.tile.mini, .back.mini { width: 1.45rem; height: 1.9rem; font-size: .7rem; }
 .tile-row { display: flex; flex-wrap: wrap; gap: .3rem; min-height: 3rem; margin-top: 1.1rem; }
 .tile {
   display: inline-grid;

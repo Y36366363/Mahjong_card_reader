@@ -348,6 +348,31 @@ function renderReplay() {
       ? `${t("browserReplayState")} · ${snapshot.round_wind || "E"}${Number(snapshot.round_hand ?? 0) + 1} · ${t("wall")} ${snapshot.live_wall_count} · ${t("browserHand")}: ${(snapshot.players?.[0]?.hand || []).map(tileLabel).join(" ")}`
       : t("browserReplayState");
   }
+  const table = $("#browser-replay-table");
+  if (table) {
+    const latest = [...browserMatch.events].slice(0, replayIndex + 1).reverse().find((event) => event.kind === "state.snapshot");
+    const snapshot = latest?.payload;
+    table.replaceChildren();
+    for (const player of snapshot?.players || []) {
+      const row = document.createElement("div");
+      row.className = "replay-player-row";
+      const label = document.createElement("strong");
+      label.textContent = `${player.name} · ${player.seat_wind || "E"} · ${player.points}`;
+      const hand = document.createElement("span");
+      hand.className = "replay-row-tiles";
+      const tiles = player.seat === 0 && player.hand ? player.hand : Array.from({ length: player.concealed_count || 0 }, () => "back");
+      hand.replaceChildren(...tiles.map((tile) => {
+        const item = document.createElement("span");
+        item.className = tile === "back" ? "back mini" : "tile mini";
+        item.textContent = tile === "back" ? "" : tileLabel(tile);
+        return item;
+      }));
+      const river = document.createElement("small");
+      river.textContent = `${t("browserRiver")}: ${(player.river || []).map(tileLabel).join(" ") || "—"}`;
+      row.append(label, hand, river);
+      table.append(row);
+    }
+  }
   $("#browser-replay-position").textContent = `${Math.max(0, replayIndex + 1)} / ${browserMatch.events.length}`;
 }
 
