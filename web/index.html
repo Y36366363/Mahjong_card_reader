@@ -156,8 +156,20 @@
       </div>
       <h3 data-i18n="browserHand">你的手牌</h3>
       <div id="browser-hand" class="browser-hand" aria-live="polite"></div>
+      <div id="browser-actions" class="button-row browser-match-actions" aria-live="polite"></div>
+      <p id="browser-settlement" class="browser-settlement" role="status" aria-live="polite"></p>
       <h3 data-i18n="browserRiver">牌河</h3>
       <div id="browser-rivers" class="browser-rivers" aria-live="polite"></div>
+      <details class="browser-replay">
+        <summary data-i18n="browserReplay">事件回放</summary>
+        <div class="button-row">
+          <button id="browser-replay-prev" class="secondary" type="button" data-i18n="browserPrev">上一事件</button>
+          <button id="browser-replay-next" class="secondary" type="button" data-i18n="browserNext">下一事件</button>
+          <button id="browser-replay-reset" class="secondary" type="button" data-i18n="browserReset">回到最新</button>
+          <span id="browser-replay-position" class="status muted">0 / 0</span>
+        </div>
+        <ol id="browser-replay-list" class="browser-replay-list" aria-live="polite"></ol>
+      </details>
     </section>
 
     <section class="roadmap">

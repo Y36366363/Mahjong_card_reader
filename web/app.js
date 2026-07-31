@@ -22,9 +22,9 @@ TEXT.ja.skipToContent = "本文へ移動";
 Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "0 - 默认", backgroundAsset1: "1 - 天才麻将少女", backgroundAsset2: "2 - 辉夜大小姐", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，对应 1/2/3 选项。" });
 Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "0 - Default", backgroundAsset1: "1 - Saki", backgroundAsset2: "2 - Kaguya-sama", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ for options 1/2/3." });
 Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "0 - デフォルト", backgroundAsset1: "1 - 咲-Saki-", backgroundAsset2: "2 - かぐや様は告らせたい", backgroundAsset3: "3 - Re:ゼロ", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置くと 1/2/3 で選べます。" });
-Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河" });
-Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match; the other three seats currently use Basic AI v1.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River" });
-Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局を開始します。他の3席は現在 Basic AI v1 です。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌" });
+Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河", browserRiichi: "立直", browserTsumo: "自摸", browserRon: "荣和", browserPass: "跳过", browserSettlement: "本局结算", browserReplay: "事件回放", browserPrev: "上一事件", browserNext: "下一事件", browserReset: "回到最新" });
+Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match; the other three seats currently use Basic AI v1.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River", browserRiichi: "Riichi", browserTsumo: "Tsumo", browserRon: "Ron", browserPass: "Pass", browserSettlement: "Hand settlement", browserReplay: "Event replay", browserPrev: "Previous event", browserNext: "Next event", browserReset: "Latest event" });
+Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局を開始します。他の3席は現在 Basic AI v1 です。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌", browserRiichi: "リーチ", browserTsumo: "ツモ", browserRon: "ロン", browserPass: "見逃す", browserSettlement: "局の精算", browserReplay: "イベント再生", browserPrev: "前のイベント", browserNext: "次のイベント", browserReset: "最新へ" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
@@ -39,6 +39,7 @@ const BACKGROUND_PRESETS = {
 };
 const BROWSER_SAVE_KEY = "mahjong-card-reader-browser-match-v1";
 let browserMatch = null;
+let replayIndex = -1;
 
 function applyLanguage() {
   currentLanguage = $("#language-setting").value || "zh";
@@ -220,6 +221,7 @@ function browserTileButton(tile, index) {
   button.className = "browser-tile-button tile";
   button.textContent = tileLabel(tile);
   button.setAttribute("aria-label", `${t("browserDiscard")}: ${tileLabel(tile)}`);
+  button.disabled = !browserMatch || browserMatch.phase !== "player-discard";
   button.addEventListener("click", () => {
     try {
       browserMatch.discard(index);
@@ -236,14 +238,20 @@ function renderBrowserMatch() {
   const status = $("#browser-match-status");
   const hand = $("#browser-hand");
   const rivers = $("#browser-rivers");
+  const actions = $("#browser-actions");
+  const settlement = $("#browser-settlement");
   if (!browserMatch) {
     status.textContent = t("browserNoGame");
     hand.replaceChildren();
     rivers.replaceChildren();
+    actions.replaceChildren();
+    settlement.replaceChildren();
+    $("#browser-replay-list").replaceChildren();
     return;
   }
   const snapshot = browserMatch.publicSnapshot();
-  status.textContent = `${t("browserStatus")} · ${snapshot.phase} · ${t("wall")} ${snapshot.live_wall_count} · ${t("browserDiscard")}`;
+  const pendingLabels = { riichi: t("browserRiichi"), tsumo: t("browserTsumo"), ron: t("browserRon"), discard: t("browserDiscard") };
+  status.textContent = `${t("browserStatus")} · ${pendingLabels[snapshot.pending?.type] || snapshot.phase} · ${t("wall")} ${snapshot.live_wall_count}`;
   hand.replaceChildren(...snapshot.players[0].hand.map((tile, index) => browserTileButton(tile, index)));
   rivers.replaceChildren(...snapshot.players.slice(1).map((player) => {
     const row = document.createElement("div");
@@ -251,10 +259,50 @@ function renderBrowserMatch() {
     row.textContent = `${player.name}: ${player.river.map(tileLabel).join(" ") || "—"}`;
     return row;
   }));
+  actions.replaceChildren();
+  if (snapshot.pending?.options) {
+    for (const option of snapshot.pending.options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = option === "pass" ? "secondary" : "primary";
+      button.textContent = option === "riichi" ? t("browserRiichi") : option === "tsumo" ? t("browserTsumo") : option === "ron" ? t("browserRon") : t("browserPass");
+      button.addEventListener("click", () => {
+        browserMatch.respond(option);
+        localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
+        renderBrowserMatch();
+      });
+      actions.append(button);
+    }
+  }
+  settlement.replaceChildren();
+  if (snapshot.settlement) {
+    const details = snapshot.settlement;
+    settlement.textContent = `${t("browserSettlement")} · ${details.win_type} · ${details.han} han / ${details.fu} fu · ${details.points} points · ${details.yaku.join(", ")}`;
+  }
+  renderReplay();
+}
+
+function renderReplay() {
+  const list = $("#browser-replay-list");
+  if (!list || !browserMatch) return;
+  if (replayIndex < 0 || replayIndex >= browserMatch.events.length) replayIndex = browserMatch.events.length - 1;
+  list.replaceChildren(...browserMatch.events.slice(0, replayIndex + 1).slice(-18).map((event) => {
+    const row = document.createElement("li");
+    row.textContent = `#${event.sequence} ${event.kind} ${JSON.stringify(event.payload)}`;
+    return row;
+  }));
+  $("#browser-replay-position").textContent = `${Math.max(0, replayIndex + 1)} / ${browserMatch.events.length}`;
+}
+
+function moveReplay(delta) {
+  if (!browserMatch) return;
+  replayIndex = Math.max(0, Math.min(browserMatch.events.length - 1, (replayIndex < 0 ? browserMatch.events.length - 1 : replayIndex) + delta));
+  renderReplay();
 }
 
 function startBrowserMatch() {
   browserMatch = new BrowserMatch({ seed: $("#seed-setting").value });
+  replayIndex = browserMatch.events.length - 1;
   localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
   renderBrowserMatch();
 }
@@ -277,6 +325,7 @@ function loadBrowserSave(event) {
   reader.addEventListener("load", () => {
     try {
       browserMatch = BrowserMatch.fromJSON(String(reader.result));
+      replayIndex = browserMatch.events.length - 1;
       localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
       renderBrowserMatch();
       $("#browser-match-status").textContent = t("browserLoaded");
@@ -334,9 +383,19 @@ $("#background-file").addEventListener("change", handleBackgroundFile);
 $("#browser-start-button").addEventListener("click", startBrowserMatch);
 $("#browser-save-button").addEventListener("click", downloadBrowserSave);
 $("#browser-load-input").addEventListener("change", loadBrowserSave);
+$("#browser-replay-prev").addEventListener("click", () => moveReplay(-1));
+$("#browser-replay-next").addEventListener("click", () => moveReplay(1));
+$("#browser-replay-reset").addEventListener("click", () => {
+  if (!browserMatch) return;
+  replayIndex = browserMatch.events.length - 1;
+  renderReplay();
+});
 try {
   const savedBrowserMatch = localStorage.getItem(BROWSER_SAVE_KEY);
-  if (savedBrowserMatch) browserMatch = BrowserMatch.fromJSON(savedBrowserMatch);
+  if (savedBrowserMatch) {
+    browserMatch = BrowserMatch.fromJSON(savedBrowserMatch);
+    replayIndex = browserMatch.events.length - 1;
+  }
 } catch {
   localStorage.removeItem(BROWSER_SAVE_KEY);
 }

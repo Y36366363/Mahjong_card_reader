@@ -509,11 +509,13 @@ work.
   serialization, public-snapshot event wrapping, a provider-neutral external AI
   recommendation interface with legal-discard validation, and a browser Phase 1
   seeded action loop. The browser loop deals a fixed wall, lets the player discard,
-  runs three Basic AI discard turns, exposes public rivers, and supports JSON save/load.
+  runs three Basic AI discard turns, exposes public rivers, supports JSON save/load,
+  and now offers browser riichi, tsumo/ron settlement, basic riichi/menzen-tsumo
+  scoring, and an event timeline viewer.
 - **Still being connected:** the existing `MahjongGame` loop still uses its tested
-  interactive compatibility adapter; browser calls, win detection, scoring,
-  settlement, and Advanced AI are not yet connected. External AI is not called
-  automatically during a turn.
+  interactive compatibility adapter; browser chi/pon/kan, full yaku/dora/fu
+  parity, round progression, and Advanced AI are not yet connected. External AI
+  is not called automatically during a turn.
 - **Safety boundary:** an external model is an advisor only. It cannot see
   concealed opponent hands, cannot bypass legal actions, and cannot directly
   mutate points or the wall. API keys must be supplied outside the repository,

@@ -61,7 +61,7 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn('id="background-setting"', index)
         self.assertIn('id="background-file"', index)
         self.assertIn('id="analysis-status" class="status" data-i18n="waiting"', index)
-        for element_id in ("browser-start-button", "browser-save-button", "browser-load-input", "browser-hand"):
+        for element_id in ("browser-start-button", "browser-save-button", "browser-load-input", "browser-hand", "browser-replay-list", "browser-replay-prev"):
             self.assertIn(f'id="{element_id}"', index)
         self.assertTrue((WEB / "assets" / "backgrounds" / "README.md").is_file())
         for number in (1, 2, 3):
