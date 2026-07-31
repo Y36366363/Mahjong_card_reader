@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import queue
 import re
 import secrets
@@ -12,6 +13,7 @@ from tkinter import messagebox, ttk
 from unittest.mock import patch
 
 from game import AI_PROFILES, WINDS, MahjongGame, dora_from_indicator
+from ai_assistant import AIProviderConfig, AIAssistantError, ExternalAIAssistant
 
 
 COLORS = {
@@ -198,6 +200,7 @@ class MahjongDesktopApp:
         self._seen_settlement: object | None = None
         self.abort_requested = False
         self.match_complete = False
+        self.external_ai_busy = False
         self.ui_scale = 1.0
         self.background_images: dict[str, tk.PhotoImage] = {}
         self._configure_style()
@@ -540,6 +543,10 @@ class MahjongDesktopApp:
                     self._show_prompt(str(payload))
                 elif kind == "error":
                     messagebox.showerror("Game error", str(payload))
+                elif kind == "external_hint":
+                    self.external_ai_busy = False
+                    self._append_log(f"External AI / 外部AI: {payload}\n")
+                    self.notice_label.config(text=f"外部 AI 建议 / External AI: {payload}")
                 elif kind == "done":
                     self.running = False
                     self.match_complete = True
@@ -593,6 +600,10 @@ class MahjongDesktopApp:
                     ),
                     justify="left", bg="#fff3cc", fg=COLORS["ink"], padx=8, pady=7,
                 ).pack(fill="x", pady=(7, 0))
+            ttk.Button(
+                self.action_frame, text="外部 AI 建议 / External AI hint",
+                command=self._request_external_ai,
+            ).pack(fill="x", pady=(7, 0))
         elif self.pending_kind == "yes_no":
             if self.game is not None and self.game.assist_mode == "hint" and self.game.last_call_report:
                 report = self.game.last_call_report
@@ -650,6 +661,30 @@ class MahjongDesktopApp:
     def _clear_actions(self) -> None:
         for child in self.action_frame.winfo_children():
             child.destroy()
+
+    def _request_external_ai(self) -> None:
+        """Request an opt-in advisor suggestion without granting move control."""
+        if self.external_ai_busy or self.game is None or self.pending_kind != "discard":
+            return
+        self.external_ai_busy = True
+        game = self.game
+        hand = list(game.players[0].hand)
+        legal = sorted(set(hand), key=lambda tile: tile)
+        snapshot = game.public_snapshot(viewer=0)
+        provider = os.getenv("MAHJONG_AI_PROVIDER", "openai")
+        model = os.getenv("MAHJONG_AI_MODEL", "")
+        key_env = os.getenv("MAHJONG_AI_KEY_ENV", "OPENAI_API_KEY")
+
+        def worker() -> None:
+            try:
+                recommendation = ExternalAIAssistant(AIProviderConfig(
+                    provider=provider, model=model, api_key_env=key_env,
+                )).recommend(hand=hand, snapshot=snapshot, legal_actions=legal)
+                self.events.put(("external_hint", f"{recommendation.tile} · {recommendation.reason}"))
+            except (AIAssistantError, OSError, ValueError) as exc:
+                self.events.put(("external_hint", f"不可用 / unavailable: {exc}"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _append_log(self, text: str) -> None:
         self.log.configure(state="normal")

@@ -40,4 +40,13 @@ const restored = BrowserMatch.fromJSON(match.save());
 assert.deepEqual(restored.publicSnapshot(), match.publicSnapshot());
 assert.equal(restored.events.length, match.events.length);
 
+const callMatch = new BrowserMatch({ seed: 8, ai: ["advanced_v1", "basic_v1", "basic_v1"] });
+callMatch.players[0].hand = ["1m", "1m", "2m", "3m"];
+assert.ok(callMatch._callOptions("1m", 1).includes("pon"));
+callMatch.pending = { type: "call", seat: 0, discarder: 1, tile: "1m", options: ["pass", "pon"] };
+callMatch.respond("pon");
+assert.equal(callMatch.players[0].melds.at(-1).kind, "pon");
+assert.equal(callMatch.players[0].hand.length, 2);
+assert.equal(callMatch.publicSnapshot().players[1].ai, "advanced_v1");
+
 console.log("Browser shanten and match engine tests passed.");

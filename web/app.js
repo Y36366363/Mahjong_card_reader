@@ -22,9 +22,9 @@ TEXT.ja.skipToContent = "本文へ移動";
 Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "0 - 默认", backgroundAsset1: "1 - 天才麻将少女", backgroundAsset2: "2 - 辉夜大小姐", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，对应 1/2/3 选项。" });
 Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "0 - Default", backgroundAsset1: "1 - Saki", backgroundAsset2: "2 - Kaguya-sama", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ for options 1/2/3." });
 Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "0 - デフォルト", backgroundAsset1: "1 - 咲-Saki-", backgroundAsset2: "2 - かぐや様は告らせたい", backgroundAsset3: "3 - Re:ゼロ", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置くと 1/2/3 で選べます。" });
-Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河", browserRiichi: "立直", browserTsumo: "自摸", browserRon: "荣和", browserPass: "跳过", browserSettlement: "本局结算", browserReplay: "事件回放", browserPrev: "上一事件", browserNext: "下一事件", browserReset: "回到最新" });
-Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match; the other three seats currently use Basic AI v1.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River", browserRiichi: "Riichi", browserTsumo: "Tsumo", browserRon: "Ron", browserPass: "Pass", browserSettlement: "Hand settlement", browserReplay: "Event replay", browserPrev: "Previous event", browserNext: "Next event", browserReset: "Latest event" });
-Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局を開始します。他の3席は現在 Basic AI v1 です。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌", browserRiichi: "リーチ", browserTsumo: "ツモ", browserRon: "ロン", browserPass: "見逃す", browserSettlement: "局の精算", browserReplay: "イベント再生", browserPrev: "前のイベント", browserNext: "次のイベント", browserReset: "最新へ" });
+Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河", browserRiichi: "立直", browserTsumo: "自摸", browserRon: "荣和", browserPon: "碰", browserChi: "吃", browserKan: "杠", browserPass: "跳过", browserSettlement: "本局结算", browserReplay: "事件回放", browserPrev: "上一事件", browserNext: "下一事件", browserReset: "回到最新" });
+Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match; the other three seats currently use Basic AI v1.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River", browserRiichi: "Riichi", browserTsumo: "Tsumo", browserRon: "Ron", browserPon: "Pon", browserChi: "Chi", browserKan: "Kan", browserPass: "Pass", browserSettlement: "Hand settlement", browserReplay: "Event replay", browserPrev: "Previous event", browserNext: "Next event", browserReset: "Latest event" });
+Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局を開始します。他の3席は現在 Basic AI v1 です。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌", browserRiichi: "リーチ", browserTsumo: "ツモ", browserRon: "ロン", browserPon: "ポン", browserChi: "チー", browserKan: "カン", browserPass: "見逃す", browserSettlement: "局の精算", browserReplay: "イベント再生", browserPrev: "前のイベント", browserNext: "次のイベント", browserReset: "最新へ" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
@@ -40,6 +40,26 @@ const BACKGROUND_PRESETS = {
 const BROWSER_SAVE_KEY = "mahjong-card-reader-browser-match-v1";
 let browserMatch = null;
 let replayIndex = -1;
+
+function playBrowserSound(kind = "action") {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  try {
+    const context = new AudioContextClass();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = kind === "win" ? 880 : kind === "call" ? 660 : 520;
+    gain.gain.setValueAtTime(0.035, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.12);
+    oscillator.addEventListener("ended", () => context.close());
+  } catch {
+    // Audio is an enhancement; browsers may block it until a user gesture.
+  }
+}
 
 function applyLanguage() {
   currentLanguage = $("#language-setting").value || "zh";
@@ -225,6 +245,7 @@ function browserTileButton(tile, index) {
   button.addEventListener("click", () => {
     try {
       browserMatch.discard(index);
+      playBrowserSound("action");
       localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
       renderBrowserMatch();
     } catch (error) {
@@ -265,9 +286,11 @@ function renderBrowserMatch() {
       const button = document.createElement("button");
       button.type = "button";
       button.className = option === "pass" ? "secondary" : "primary";
-      button.textContent = option === "riichi" ? t("browserRiichi") : option === "tsumo" ? t("browserTsumo") : option === "ron" ? t("browserRon") : t("browserPass");
+      const actionKind = option.split(":", 1)[0];
+      button.textContent = actionKind === "riichi" ? t("browserRiichi") : actionKind === "tsumo" ? t("browserTsumo") : actionKind === "ron" ? t("browserRon") : actionKind === "pon" ? t("browserPon") : actionKind === "chi" ? `${t("browserChi")} ${option.slice(4)}` : actionKind === "kan" ? t("browserKan") : t("browserPass");
       button.addEventListener("click", () => {
         browserMatch.respond(option);
+        playBrowserSound(option === "tsumo" || option === "ron" ? "win" : option === "pon" || option.startsWith("chi") || option === "kan" ? "call" : "action");
         localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
         renderBrowserMatch();
       });
@@ -301,9 +324,11 @@ function moveReplay(delta) {
 }
 
 function startBrowserMatch() {
-  browserMatch = new BrowserMatch({ seed: $("#seed-setting").value });
+  const settings = settingsSnapshot();
+  browserMatch = new BrowserMatch({ seed: settings.seed, ai: settings.ai, temperature: settings.temperature });
   replayIndex = browserMatch.events.length - 1;
   localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
+  playBrowserSound("action");
   renderBrowserMatch();
 }
 

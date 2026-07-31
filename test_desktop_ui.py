@@ -55,6 +55,12 @@ class DesktopUIAdapterTests(unittest.TestCase):
         with patch("desktop_ui.secrets.randbits", return_value=987654321):
             self.assertEqual(resolve_desktop_seed(""), 987654321)
 
+    def test_packaging_assets_are_declared(self) -> None:
+        from pathlib import Path
+        root = Path(__file__).parent
+        self.assertTrue((root / "mahjong_card_reader.spec").is_file())
+        self.assertTrue((root / "packaging" / "README.md").is_file())
+
     def test_three_opponents_support_presets_and_individual_profiles(self) -> None:
         self.assertEqual(
             AI_LINEUP_PRESETS["全部高级 / All Advanced"],

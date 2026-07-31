@@ -15,6 +15,11 @@
 - Connected the event log to match start/end, hand start/deal/settlement, public snapshots, and discard actions. `MahjongGame.save_replay()` and `MahjongGame.load_replay()` now provide a local JSON replay stream without changing the interactive loop.
 - Added browser accessibility foundations: skip-to-content navigation, keyboard-visible focus rings, reduced-motion support, semantic tile labels, hidden decorative tile backs, and labelled player panels.
 - Added `.env.example` and ignored local `.env` credentials. Provider defaults are `gpt-4o-mini`, `deepseek-chat`, and `gemini-flash-latest`; API checks must be run locally and never print keys.
+- Added browser Phase 2 actions: riichi, tsumo, ron, basic pon/chi/kan offers, JSON settlement records, and a keyboard-friendly event timeline.
+- Added a selectable browser Advanced AI v1 profile. Its browser policy preserves minimum shanten first, while Basic AI v1 remains the deterministic baseline.
+- Added a safe, opt-in desktop **External AI hint** action. It runs in a worker, validates the recommendation against legal discards, never plays the move automatically, and reads provider configuration from environment variables.
+- Added `mahjong_card_reader.spec` and packaging instructions for PyInstaller standalone desktop builds, including the PNG background assets without bundling API keys.
+- Added browser action feedback sound with reduced-motion/sound-safe fallback and animated tile focus states.
 
 ## Updates 7/29/2026
 
@@ -510,12 +515,14 @@ work.
   recommendation interface with legal-discard validation, and a browser Phase 1
   seeded action loop. The browser loop deals a fixed wall, lets the player discard,
   runs three Basic AI discard turns, exposes public rivers, supports JSON save/load,
-  and now offers browser riichi, tsumo/ron settlement, basic riichi/menzen-tsumo
-  scoring, and an event timeline viewer.
+  and now offers browser riichi, tsumo/ron settlement, basic pon/chi/kan offers,
+  basic riichi/menzen-tsumo scoring, an event timeline viewer, and an opt-in
+  Advanced AI v1 discard policy.
 - **Still being connected:** the existing `MahjongGame` loop still uses its tested
-  interactive compatibility adapter; browser chi/pon/kan, full yaku/dora/fu
-  parity, round progression, and Advanced AI are not yet connected. External AI
-  is not called automatically during a turn.
+  interactive compatibility adapter; browser full yaku/dora/fu parity and round
+  progression are not yet connected. Browser external AI remains intentionally
+  disabled because GitHub Pages must never receive a provider API key; the desktop
+  action is opt-in and manual.
 - **Safety boundary:** an external model is an advisor only. It cannot see
   concealed opponent hands, cannot bypass legal actions, and cannot directly
   mutate points or the wall. API keys must be supplied outside the repository,

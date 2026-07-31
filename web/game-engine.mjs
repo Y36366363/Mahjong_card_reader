@@ -44,13 +44,15 @@ function copy(value) {
  * is still represented as a versioned event and can be saved/replayed.
  */
 export class BrowserMatch {
-  constructor({ seed = "", saved = null } = {}) {
+  constructor({ seed = "", ai = ["basic_v1", "basic_v1", "basic_v1"], temperature = 0.2, saved = null } = {}) {
     if (saved) {
       this._restore(saved);
       return;
     }
     const seedInfo = numericSeed(seed);
     this.seed = seedInfo.text;
+    this.ai = [...ai];
+    this.temperature = Number(temperature) || 0;
     this.random = rng(seedInfo.value);
     this.wall = makeWall(this.random);
     this.players = Array.from({ length: 4 }, (_, seat) => ({
@@ -112,7 +114,8 @@ export class BrowserMatch {
     const drawn = this.wall.pop();
     player.hand.push(drawn);
     player.hand = sortedHand(player.hand);
-    const discard = player.hand.shift();
+    const discard = this._chooseOpponentDiscard(seat);
+    player.hand.splice(player.hand.indexOf(discard), 1);
     player.river.push(discard);
     this._emit("action.draw", { seat, tile: drawn });
     const result = calculateShanten(tilesToCounts(player.hand));
@@ -120,8 +123,22 @@ export class BrowserMatch {
       this._settleWin(seat, null, "tsumo");
       return false;
     }
-    this._emit("action.discard", { seat, tile: discard, ai: "basic_v1" });
+    this._emit("action.discard", { seat, tile: discard, ai: this.ai[seat - 1] || "basic_v1" });
     return true;
+  }
+
+  _chooseOpponentDiscard(seat) {
+    const player = this.players[seat];
+    if ((this.ai[seat - 1] || "basic_v1") !== "advanced_v1") return sortedHand(player.hand)[0];
+    let best = null;
+    for (const tile of sortedHand([...new Set(player.hand)])) {
+      const hand = player.hand.slice();
+      hand.splice(hand.indexOf(tile), 1);
+      const result = calculateShanten(tilesToCounts(hand));
+      const candidate = { tile, shanten: result.minimum };
+      if (!best || candidate.shanten < best.shanten || (candidate.shanten === best.shanten && TILE_INDEX.get(tile) < TILE_INDEX.get(best.tile))) best = candidate;
+    }
+    return best?.tile || sortedHand(player.hand)[0];
   }
 
   _continueOpponents() {
@@ -138,9 +155,37 @@ export class BrowserMatch {
         this._emit("state.snapshot", this.publicSnapshot());
         return;
       }
+      const calls = this._callOptions(this.players[seat].river.at(-1), seat);
+      if (calls.length) {
+        this.phase = "player-call";
+        this.pending = { type: "call", seat: 0, discarder: seat, tile: this.players[seat].river.at(-1), options: ["pass", ...calls] };
+        this._emit("action.offer", { seat: 0, action: "call", options: calls });
+        this._emit("state.snapshot", this.publicSnapshot());
+        return;
+      }
     }
     this.opponentCursor = 1;
     this._drawPlayer();
+  }
+
+  _callOptions(tile, discarder) {
+    const hand = this.players[0].hand;
+    const count = hand.filter((candidate) => candidate === tile).length;
+    const options = [];
+    if (count >= 2) options.push("pon");
+    if (count >= 3) options.push("kan");
+    const index = TILE_INDEX.get(tile);
+    if (discarder === 3 && index < 27) {
+      const suitStart = Math.floor(index / 9) * 9;
+      const position = index - suitStart;
+      const sequences = [[position - 2, position - 1], [position - 1, position + 1], [position + 1, position + 2]];
+      for (const positions of sequences) {
+        if (positions.some((value) => value < 0 || value > 8)) continue;
+        const needed = positions.map((value) => TILE_NAMES[suitStart + value]);
+        if (needed.every((candidate) => hand.includes(candidate))) options.push(`chi:${needed.join(",")}`);
+      }
+    }
+    return options;
   }
 
   discard(tileOrIndex) {
@@ -155,7 +200,7 @@ export class BrowserMatch {
     this.lastDraw = null;
     this._emit("action.discard", { seat: 0, tile });
     const result = calculateShanten(tilesToCounts(player.hand));
-    if (result.minimum === 0 && !player.riichi) {
+    if (result.minimum === 0 && !player.riichi && player.melds.length === 0) {
       this.phase = "riichi-choice";
       this.pending = { type: "riichi", seat: 0, options: ["riichi", "pass"] };
       this._emit("action.offer", { seat: 0, action: "riichi" });
@@ -186,6 +231,20 @@ export class BrowserMatch {
     } else if (pending.type === "ron") {
       if (action === "ron") this._settleWin(0, pending.loser, "ron");
       else this._continueOpponents();
+    } else if (pending.type === "call") {
+      if (action !== "pass") {
+        const tile = pending.tile;
+        const player = this.players[0];
+        const kind = action.split(":", 1)[0];
+        const needed = kind === "pon" ? [tile, tile] : kind === "kan" ? [tile, tile, tile] : action.slice(4).split(",");
+        for (const candidate of needed) player.hand.splice(player.hand.indexOf(candidate), 1);
+        player.melds.push({ kind, tiles: [tile, ...needed], open: true });
+        this.phase = "player-discard";
+        this.pending = { type: "discard", seat: 0, options: this.legalDiscards() };
+        this._emit("action.call", { seat: 0, kind, tile, discarder: pending.discarder });
+      } else {
+        this._continueOpponents();
+      }
     }
     this._emit("state.snapshot", this.publicSnapshot());
     return this.publicSnapshot();
@@ -235,6 +294,8 @@ export class BrowserMatch {
     return {
       schema_version: BROWSER_GAME_SCHEMA_VERSION,
       seed: this.seed,
+      ai: [...this.ai],
+      temperature: this.temperature,
       phase: this.phase,
       pending: this.pending ? copy(this.pending) : null,
       current_seat: this.currentSeat,
@@ -245,6 +306,7 @@ export class BrowserMatch {
         hand: player.seat === 0 ? [...player.hand] : null,
         river: [...player.river], riichi: player.riichi,
         melds: copy(player.melds),
+        ai: player.seat > 0 ? (this.ai[player.seat - 1] || "basic_v1") : null,
       })),
       last_draw: this.lastDraw,
       settlement: this.settlement ? copy(this.settlement) : null,
@@ -257,7 +319,8 @@ export class BrowserMatch {
       seed: this.seed,
       state: { wall: this.wall, players: this.players, currentSeat: this.currentSeat,
         phase: this.phase, lastDraw: this.lastDraw, pending: this.pending,
-        opponentCursor: this.opponentCursor, settlement: this.settlement },
+        opponentCursor: this.opponentCursor, settlement: this.settlement,
+        ai: this.ai, temperature: this.temperature },
       events: this.events,
     });
   }
@@ -272,6 +335,8 @@ export class BrowserMatch {
 
   _restore(saved) {
     this.seed = String(saved.seed ?? "");
+    this.ai = Array.isArray(saved.state?.ai) ? [...saved.state.ai] : ["basic_v1", "basic_v1", "basic_v1"];
+    this.temperature = Number(saved.state?.temperature ?? 0.2);
     this.random = rng(numericSeed(this.seed).value);
     const state = saved.state;
     if (!state || !Array.isArray(state.wall) || !Array.isArray(state.players)) {
