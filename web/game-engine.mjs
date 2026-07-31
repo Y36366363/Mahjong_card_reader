@@ -1,4 +1,5 @@
 import { TILE_NAMES, calculateShanten, tilesToCounts } from "./mahjong-core.mjs";
+import { scoreHand } from "./scoring.mjs";
 
 export const BROWSER_GAME_SCHEMA_VERSION = 1;
 
@@ -44,7 +45,7 @@ function copy(value) {
  * is still represented as a versioned event and can be saved/replayed.
  */
 export class BrowserMatch {
-  constructor({ seed = "", ai = ["basic_v1", "basic_v1", "basic_v1"], temperature = 0.2, saved = null } = {}) {
+  constructor({ seed = "", ai = ["basic_v1", "basic_v1", "basic_v1"], temperature = 0.2, match = "east", saved = null } = {}) {
     if (saved) {
       this._restore(saved);
       return;
@@ -53,18 +54,27 @@ export class BrowserMatch {
     this.seed = seedInfo.text;
     this.ai = [...ai];
     this.temperature = Number(temperature) || 0;
+    this.matchLength = match === "south" ? "south" : "east";
     this.random = rng(seedInfo.value);
     this.wall = makeWall(this.random);
+    this.doraIndicators = [this.wall.pop()];
+    this.uraIndicators = [this.wall.pop()];
     this.players = Array.from({ length: 4 }, (_, seat) => ({
       seat, name: seat === 0 ? "You" : `AI-${seat}`, points: 25000,
       hand: [], river: [], melds: [], riichi: false,
     }));
+    this.dealer = 0;
+    this.roundWind = "E";
+    this.roundWindIndex = 0;
+    this.seatWinds = ["E", "S", "W", "N"];
     this.currentSeat = 0;
     this.phase = "player-discard";
     this.lastDraw = null;
     this.pending = { type: "discard", seat: 0, options: [] };
     this.opponentCursor = 1;
     this.settlement = null;
+    this.roundHand = 0;
+    this.matchEnded = false;
     this.events = [];
     this._emit("match.started", { seed: this.seed, players: 4 });
     for (let count = 0; count < 13; count += 1) {
@@ -87,7 +97,9 @@ export class BrowserMatch {
   _drawPlayer() {
     if (!this.wall.length) {
       this.phase = "ended";
-      this._emit("hand.finished", { reason: "exhaustive_draw" });
+      this.settlement = { win_type: "draw", reason: "exhaustive_draw" };
+      this.pending = { type: "next_hand", options: ["next"] };
+      this._emit("hand.finished", { settlement: this.settlement });
       return;
     }
     const tile = this.wall.pop();
@@ -99,7 +111,7 @@ export class BrowserMatch {
     const result = calculateShanten(tilesToCounts(player.hand));
     if (result.standard === -1 || result.minimum === -1) {
       this.phase = "player-win";
-      this.pending = { type: "tsumo", seat: 0, options: ["tsumo", "pass"] };
+      this.pending = { type: "tsumo", seat: 0, tile, options: ["tsumo", "pass"] };
       this._emit("action.offer", { seat: 0, action: "tsumo" });
     } else {
       this.phase = "player-discard";
@@ -120,8 +132,13 @@ export class BrowserMatch {
     this._emit("action.draw", { seat, tile: drawn });
     const result = calculateShanten(tilesToCounts(player.hand));
     if (result.standard === -1 || result.minimum === -1) {
-      this._settleWin(seat, null, "tsumo");
+      this._settleWin(seat, null, "tsumo", drawn);
       return false;
+    }
+    if (result.minimum === 0 && !player.riichi && player.melds.length === 0 && (this.ai[seat - 1] || "basic_v1") === "advanced_v1") {
+      player.riichi = true;
+      player.points -= 1000;
+      this._emit("action.riichi", { seat, ai: "advanced_v1" });
     }
     this._emit("action.discard", { seat, tile: discard, ai: this.ai[seat - 1] || "basic_v1" });
     return true;
@@ -131,12 +148,14 @@ export class BrowserMatch {
     const player = this.players[seat];
     if ((this.ai[seat - 1] || "basic_v1") !== "advanced_v1") return sortedHand(player.hand)[0];
     let best = null;
+    const threats = this.players.filter((candidate) => candidate.seat !== seat && candidate.riichi);
     for (const tile of sortedHand([...new Set(player.hand)])) {
       const hand = player.hand.slice();
       hand.splice(hand.indexOf(tile), 1);
       const result = calculateShanten(tilesToCounts(hand));
-      const candidate = { tile, shanten: result.minimum };
-      if (!best || candidate.shanten < best.shanten || (candidate.shanten === best.shanten && TILE_INDEX.get(tile) < TILE_INDEX.get(best.tile))) best = candidate;
+      const safe = threats.filter((threat) => threat.river.includes(tile)).length;
+      const candidate = { tile, shanten: result.minimum, safe };
+      if (!best || candidate.shanten < best.shanten || (candidate.shanten === best.shanten && (candidate.safe > best.safe || (candidate.safe === best.safe && TILE_INDEX.get(tile) < TILE_INDEX.get(best.tile))))) best = candidate;
     }
     return best?.tile || sortedHand(player.hand)[0];
   }
@@ -150,7 +169,7 @@ export class BrowserMatch {
       const ronResult = calculateShanten(tilesToCounts(ronHand));
       if (ronResult.standard === -1 && player.riichi) {
         this.phase = "player-ron";
-        this.pending = { type: "ron", seat: 0, loser: seat, options: ["ron", "pass"] };
+        this.pending = { type: "ron", seat: 0, loser: seat, tile: this.players[seat].river.at(-1), options: ["ron", "pass"] };
         this._emit("action.offer", { seat: 0, action: "ron", loser: seat });
         this._emit("state.snapshot", this.publicSnapshot());
         return;
@@ -226,10 +245,10 @@ export class BrowserMatch {
       }
       this._continueOpponents();
     } else if (pending.type === "tsumo") {
-      if (action === "tsumo") this._settleWin(0, null, "tsumo");
+      if (action === "tsumo") this._settleWin(0, null, "tsumo", pending.tile);
       else this._continueOpponents();
     } else if (pending.type === "ron") {
-      if (action === "ron") this._settleWin(0, pending.loser, "ron");
+      if (action === "ron") this._settleWin(0, pending.loser, "ron", pending.tile);
       else this._continueOpponents();
     } else if (pending.type === "call") {
       if (action !== "pass") {
@@ -245,27 +264,23 @@ export class BrowserMatch {
       } else {
         this._continueOpponents();
       }
+    } else if (pending.type === "next_hand") {
+      this.nextHand();
     }
     this._emit("state.snapshot", this.publicSnapshot());
     return this.publicSnapshot();
   }
 
-  _scoreFor(winner, winType) {
+  _scoreFor(winner, winType, winTile = null) {
     const player = this.players[winner];
-    const yaku = [];
-    if (player.riichi) yaku.push("Riichi");
-    if (winType === "tsumo") yaku.push("Menzen Tsumo");
-    const han = Math.max(1, yaku.length);
-    const fu = 30;
-    const base = Math.min(2000, fu * (2 ** (han + 2)));
-    const ron = Math.ceil((base * 4) / 100) * 100;
-    const tsumoDealer = Math.ceil((base * 2) / 100) * 100;
-    const tsumoChild = Math.ceil(base / 100) * 100;
-    return { han, fu, yaku, ron, tsumo_dealer: tsumoDealer, tsumo_child: tsumoChild };
+    const hand = winType === "ron" && winTile ? [...player.hand, winTile] : [...player.hand];
+    return scoreHand({ hand, melds: player.melds, winType, riichi: player.riichi,
+      dealer: winner === this.dealer, doraIndicators: this.doraIndicators,
+      uraIndicators: this.uraIndicators });
   }
 
-  _settleWin(winner, loser, winType) {
-    const score = this._scoreFor(winner, winType);
+  _settleWin(winner, loser, winType, winTile = null) {
+    const score = this._scoreFor(winner, winType, winTile);
     let points;
     if (winType === "ron") {
       points = score.ron;
@@ -280,10 +295,48 @@ export class BrowserMatch {
         this.players[winner].points += payment;
       }
     }
-    this.settlement = { winner, loser, win_type: winType, points, ...score };
+    this.settlement = { winner, loser, win_type: winType, points, dora_indicators: this.doraIndicators, ura_indicators: this.uraIndicators, ...score };
     this.phase = "ended";
-    this.pending = null;
+    this.pending = { type: "next_hand", options: ["next"] };
     this._emit("hand.finished", { settlement: this.settlement });
+  }
+
+  nextHand() {
+    if (this.phase !== "ended" || this.matchEnded) throw new Error("当前不能进入下一局。");
+    const dealerWon = this.settlement?.winner === this.dealer;
+    if (!dealerWon) this.dealer = (this.dealer + 1) % 4;
+    this.roundHand += 1;
+    if (this.roundHand >= 4) {
+      const leaderAboveThirty = Math.max(...this.players.map((player) => player.points)) >= 30000;
+      const configuredTarget = this.matchLength === "south" ? 1 : 0;
+      if (this.roundWindIndex < configuredTarget || (!leaderAboveThirty && this.roundWindIndex < 2)) {
+        this.roundWindIndex += 1;
+        this.roundWind = ["E", "S", "W"][this.roundWindIndex];
+        this.roundHand = 0;
+      } else {
+        this.matchEnded = true;
+        this.pending = null;
+        this._emit("match.finished", { players: this.players.map((player) => ({ seat: player.seat, points: player.points })) });
+        return this.publicSnapshot();
+      }
+    }
+    this.wall = makeWall(this.random);
+    this.doraIndicators = [this.wall.pop()];
+    this.uraIndicators = [this.wall.pop()];
+    for (const player of this.players) {
+      player.hand = []; player.river = []; player.melds = []; player.riichi = false;
+    }
+    this.seatWinds = ["E", "S", "W", "N"].map((_, index) => ["E", "S", "W", "N"][(index - this.dealer + 4) % 4]);
+    for (let count = 0; count < 13; count += 1) {
+      for (const player of this.players) player.hand.push(this.wall.pop());
+    }
+    this.players.forEach((player) => { player.hand = sortedHand(player.hand); });
+    this.phase = "player-discard";
+    this.settlement = null;
+    this.opponentCursor = 1;
+    this._emit("hand.started", { round_wind: this.roundWind, round_hand: this.roundHand, dealer: this.dealer });
+    this._drawPlayer();
+    return this.publicSnapshot();
   }
 
   legalDiscards() {
@@ -300,6 +353,8 @@ export class BrowserMatch {
       pending: this.pending ? copy(this.pending) : null,
       current_seat: this.currentSeat,
       live_wall_count: this.wall.length,
+      dora_indicators: [...this.doraIndicators],
+      ura_indicators_hidden: this.uraIndicators.length,
       players: this.players.map((player) => ({
         seat: player.seat, name: player.name, points: player.points,
         concealed_count: player.hand.length,
@@ -307,9 +362,16 @@ export class BrowserMatch {
         river: [...player.river], riichi: player.riichi,
         melds: copy(player.melds),
         ai: player.seat > 0 ? (this.ai[player.seat - 1] || "basic_v1") : null,
+        seat_wind: this.seatWinds?.[player.seat] || "E",
       })),
       last_draw: this.lastDraw,
       settlement: this.settlement ? copy(this.settlement) : null,
+      round_hand: this.roundHand,
+      round_wind: this.roundWind,
+      round_wind_index: this.roundWindIndex,
+      match_length: this.matchLength,
+      dealer: this.dealer,
+      match_ended: this.matchEnded,
     };
   }
 
@@ -320,7 +382,11 @@ export class BrowserMatch {
       state: { wall: this.wall, players: this.players, currentSeat: this.currentSeat,
         phase: this.phase, lastDraw: this.lastDraw, pending: this.pending,
         opponentCursor: this.opponentCursor, settlement: this.settlement,
-        ai: this.ai, temperature: this.temperature },
+        ai: this.ai, temperature: this.temperature, dealer: this.dealer,
+        roundHand: this.roundHand, matchEnded: this.matchEnded,
+        roundWind: this.roundWind, roundWindIndex: this.roundWindIndex, matchLength: this.matchLength,
+        doraIndicators: this.doraIndicators,
+        uraIndicators: this.uraIndicators },
       events: this.events,
     });
   }
@@ -337,12 +403,21 @@ export class BrowserMatch {
     this.seed = String(saved.seed ?? "");
     this.ai = Array.isArray(saved.state?.ai) ? [...saved.state.ai] : ["basic_v1", "basic_v1", "basic_v1"];
     this.temperature = Number(saved.state?.temperature ?? 0.2);
+    this.matchLength = saved.state?.matchLength === "south" ? "south" : "east";
     this.random = rng(numericSeed(this.seed).value);
     const state = saved.state;
     if (!state || !Array.isArray(state.wall) || !Array.isArray(state.players)) {
       throw new Error("浏览器牌局存档缺少状态。");
     }
     this.wall = [...state.wall];
+    this.dealer = Number(state.dealer ?? 0);
+    this.roundHand = Number(state.roundHand ?? 0);
+    this.matchEnded = Boolean(state.matchEnded);
+    this.roundWind = state.roundWind || "E";
+    this.roundWindIndex = Number(state.roundWindIndex ?? (["E", "S", "W"].indexOf(this.roundWind)));
+    this.doraIndicators = [...(state.doraIndicators || [])];
+    this.uraIndicators = [...(state.uraIndicators || [])];
+    this.seatWinds = ["E", "S", "W", "N"].map((_, index) => ["E", "S", "W", "N"][(index - this.dealer + 4) % 4]);
     this.players = copy(state.players);
     this.currentSeat = Number(state.currentSeat ?? 0);
     this.phase = String(state.phase ?? "ended");

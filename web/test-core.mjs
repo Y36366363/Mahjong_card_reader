@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { calculateShanten, effectiveTiles, parseTiles } from "./mahjong-core.mjs";
 import { BrowserMatch } from "./game-engine.mjs";
+import { scoreHand } from "./scoring.mjs";
 
 const cases = [
   ["1m 2m 3m 4m 5m 6m 2p 3p 4p 6s 7s E E", [0, 5, 10]],
@@ -30,7 +31,7 @@ assert.throws(
 
 const match = new BrowserMatch({ seed: 20260731 });
 assert.equal(match.publicSnapshot().players[0].hand.length, 14);
-assert.equal(match.publicSnapshot().live_wall_count, 83);
+assert.equal(match.publicSnapshot().live_wall_count, 81);
 const before = match.events.length;
 const discard = match.legalDiscards()[0];
 match.discard(discard);
@@ -48,5 +49,13 @@ callMatch.respond("pon");
 assert.equal(callMatch.players[0].melds.at(-1).kind, "pon");
 assert.equal(callMatch.players[0].hand.length, 2);
 assert.equal(callMatch.publicSnapshot().players[1].ai, "advanced_v1");
+
+const score = scoreHand({
+  hand: ["1m", "2m", "3m", "1p", "2p", "3p", "1s", "2s", "3s", "7s", "8s", "9s", "E", "E"],
+  winType: "tsumo", riichi: true, doraIndicators: ["9m"], uraIndicators: ["8m"],
+});
+assert.ok(score.yaku.includes("Riichi"));
+assert.equal(score.ura, 0);
+assert.ok(score.han >= 2);
 
 console.log("Browser shanten and match engine tests passed.");

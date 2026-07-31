@@ -22,9 +22,9 @@ TEXT.ja.skipToContent = "本文へ移動";
 Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "0 - 默认", backgroundAsset1: "1 - 天才麻将少女", backgroundAsset2: "2 - 辉夜大小姐", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，对应 1/2/3 选项。" });
 Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "0 - Default", backgroundAsset1: "1 - Saki", backgroundAsset2: "2 - Kaguya-sama", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ for options 1/2/3." });
 Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "0 - デフォルト", backgroundAsset1: "1 - 咲-Saki-", backgroundAsset2: "2 - かぐや様は告らせたい", backgroundAsset3: "3 - Re:ゼロ", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置くと 1/2/3 で選べます。" });
-Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家暂时使用 Basic AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河", browserRiichi: "立直", browserTsumo: "自摸", browserRon: "荣和", browserPon: "碰", browserChi: "吃", browserKan: "杠", browserPass: "跳过", browserSettlement: "本局结算", browserReplay: "事件回放", browserPrev: "上一事件", browserNext: "下一事件", browserReset: "回到最新" });
-Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match; the other three seats currently use Basic AI v1.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River", browserRiichi: "Riichi", browserTsumo: "Tsumo", browserRon: "Ron", browserPon: "Pon", browserChi: "Chi", browserKan: "Kan", browserPass: "Pass", browserSettlement: "Hand settlement", browserReplay: "Event replay", browserPrev: "Previous event", browserNext: "Next event", browserReset: "Latest event" });
-Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局を開始します。他の3席は現在 Basic AI v1 です。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌", browserRiichi: "リーチ", browserTsumo: "ツモ", browserRon: "ロン", browserPon: "ポン", browserChi: "チー", browserKan: "カン", browserPass: "見逃す", browserSettlement: "局の精算", browserReplay: "イベント再生", browserPrev: "前のイベント", browserNext: "次のイベント", browserReset: "最新へ" });
+Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家可选择 Basic 或 Advanced AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河", browserRiichi: "立直", browserTsumo: "自摸", browserRon: "荣和", browserPon: "碰", browserChi: "吃", browserKan: "杠", browserCall: "鸣牌", browserPass: "跳过", browserNextHand: "确认进入下一局", browserFinal: "对局结束", browserSettlement: "本局结算", browserReplay: "事件回放", browserPrev: "上一事件", browserNext: "下一事件", browserReset: "回到最新", browserReplayState: "牌桌状态", browserLocalAI: "请求本地 AI 建议", browserLocalAIPending: "正在请求本地 AI…", browserLocalAIUnavailable: "本地 AI 服务不可用，请先启动 ai_advisor_server.py。" });
+Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match with Basic or Advanced AI v1 seats.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River", browserRiichi: "Riichi", browserTsumo: "Tsumo", browserRon: "Ron", browserPon: "Pon", browserChi: "Chi", browserKan: "Kan", browserCall: "Call", browserPass: "Pass", browserNextHand: "Continue to next hand", browserFinal: "Match complete", browserSettlement: "Hand settlement", browserReplay: "Event replay", browserPrev: "Previous event", browserNext: "Next event", browserReset: "Latest event", browserReplayState: "Table state", browserLocalAI: "Ask local AI for a hint", browserLocalAIPending: "Requesting local AI…", browserLocalAIUnavailable: "Local AI service unavailable. Start ai_advisor_server.py first." });
+Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局。Basic / Advanced AI v1 を選択できます。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌", browserRiichi: "リーチ", browserTsumo: "ツモ", browserRon: "ロン", browserPon: "ポン", browserChi: "チー", browserKan: "カン", browserCall: "鳴き", browserPass: "見逃す", browserNextHand: "次の局へ", browserFinal: "対局終了", browserSettlement: "局の精算", browserReplay: "イベント再生", browserPrev: "前のイベント", browserNext: "次のイベント", browserReset: "最新へ", browserReplayState: "卓の状態", browserLocalAI: "ローカル AI に提案を依頼", browserLocalAIPending: "ローカル AI に問い合わせ中…", browserLocalAIUnavailable: "ローカル AI サービスが利用できません。先に ai_advisor_server.py を起動してください。" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
@@ -255,6 +255,25 @@ function browserTileButton(tile, index) {
   return button;
 }
 
+async function requestBrowserAI() {
+  if (!browserMatch) return;
+  const status = $("#browser-match-status");
+  status.textContent = t("browserLocalAIPending");
+  try {
+    const snapshot = browserMatch.publicSnapshot();
+    const response = await fetch("http://127.0.0.1:8766/recommend", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hand: snapshot.players[0].hand, snapshot, legal_actions: snapshot.pending?.options || [] }),
+    });
+    if (!response.ok) throw new Error("local service error");
+    const data = await response.json();
+    const recommendation = data.recommendation || data.message || "—";
+    status.textContent = `${t("browserStatus")} · ${recommendation}`;
+  } catch {
+    status.textContent = t("browserLocalAIUnavailable");
+  }
+}
+
 function renderBrowserMatch() {
   const status = $("#browser-match-status");
   const hand = $("#browser-hand");
@@ -271,7 +290,7 @@ function renderBrowserMatch() {
     return;
   }
   const snapshot = browserMatch.publicSnapshot();
-  const pendingLabels = { riichi: t("browserRiichi"), tsumo: t("browserTsumo"), ron: t("browserRon"), discard: t("browserDiscard") };
+  const pendingLabels = { riichi: t("browserRiichi"), tsumo: t("browserTsumo"), ron: t("browserRon"), call: t("browserCall"), next_hand: t("browserNextHand"), discard: t("browserDiscard") };
   status.textContent = `${t("browserStatus")} · ${pendingLabels[snapshot.pending?.type] || snapshot.phase} · ${t("wall")} ${snapshot.live_wall_count}`;
   hand.replaceChildren(...snapshot.players[0].hand.map((tile, index) => browserTileButton(tile, index)));
   rivers.replaceChildren(...snapshot.players.slice(1).map((player) => {
@@ -281,13 +300,20 @@ function renderBrowserMatch() {
     return row;
   }));
   actions.replaceChildren();
+  const aiButton = document.createElement("button");
+  aiButton.type = "button";
+  aiButton.className = "secondary";
+  aiButton.textContent = t("browserLocalAI");
+  aiButton.disabled = snapshot.phase !== "player-discard";
+  aiButton.addEventListener("click", requestBrowserAI);
+  actions.append(aiButton);
   if (snapshot.pending?.options) {
     for (const option of snapshot.pending.options) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = option === "pass" ? "secondary" : "primary";
       const actionKind = option.split(":", 1)[0];
-      button.textContent = actionKind === "riichi" ? t("browserRiichi") : actionKind === "tsumo" ? t("browserTsumo") : actionKind === "ron" ? t("browserRon") : actionKind === "pon" ? t("browserPon") : actionKind === "chi" ? `${t("browserChi")} ${option.slice(4)}` : actionKind === "kan" ? t("browserKan") : t("browserPass");
+      button.textContent = option === "next" ? t("browserNextHand") : actionKind === "riichi" ? t("browserRiichi") : actionKind === "tsumo" ? t("browserTsumo") : actionKind === "ron" ? t("browserRon") : actionKind === "pon" ? t("browserPon") : actionKind === "chi" ? `${t("browserChi")} ${option.slice(4)}` : actionKind === "kan" ? t("browserKan") : t("browserPass");
       button.addEventListener("click", () => {
         browserMatch.respond(option);
         playBrowserSound(option === "tsumo" || option === "ron" ? "win" : option === "pon" || option.startsWith("chi") || option === "kan" ? "call" : "action");
@@ -300,7 +326,7 @@ function renderBrowserMatch() {
   settlement.replaceChildren();
   if (snapshot.settlement) {
     const details = snapshot.settlement;
-    settlement.textContent = `${t("browserSettlement")} · ${details.win_type} · ${details.han} han / ${details.fu} fu · ${details.points} points · ${details.yaku.join(", ")}`;
+    settlement.textContent = details.win_type === "draw" ? `${t("browserSettlement")} · ${t("browserFinal")}` : `${t("browserSettlement")} · ${details.win_type} · ${details.han} han / ${details.fu} fu · ${details.points} points · ${details.yaku.join(", ")}`;
   }
   renderReplay();
 }
@@ -314,6 +340,14 @@ function renderReplay() {
     row.textContent = `#${event.sequence} ${event.kind} ${JSON.stringify(event.payload)}`;
     return row;
   }));
+  const stateBox = $("#browser-replay-state");
+  if (stateBox) {
+    const latest = [...browserMatch.events].slice(0, replayIndex + 1).reverse().find((event) => event.kind === "state.snapshot");
+    const snapshot = latest?.payload;
+    stateBox.textContent = snapshot
+      ? `${t("browserReplayState")} · ${snapshot.round_wind || "E"}${Number(snapshot.round_hand ?? 0) + 1} · ${t("wall")} ${snapshot.live_wall_count} · ${t("browserHand")}: ${(snapshot.players?.[0]?.hand || []).map(tileLabel).join(" ")}`
+      : t("browserReplayState");
+  }
   $("#browser-replay-position").textContent = `${Math.max(0, replayIndex + 1)} / ${browserMatch.events.length}`;
 }
 
@@ -325,7 +359,7 @@ function moveReplay(delta) {
 
 function startBrowserMatch() {
   const settings = settingsSnapshot();
-  browserMatch = new BrowserMatch({ seed: settings.seed, ai: settings.ai, temperature: settings.temperature });
+  browserMatch = new BrowserMatch({ seed: settings.seed, ai: settings.ai, temperature: settings.temperature, match: settings.match });
   replayIndex = browserMatch.events.length - 1;
   localStorage.setItem(BROWSER_SAVE_KEY, browserMatch.save());
   playBrowserSound("action");

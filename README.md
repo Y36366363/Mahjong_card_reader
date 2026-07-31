@@ -211,6 +211,27 @@ It also tracks remaining tile counts (tiles unseen in your hand + river).
   - optional: dora / riichi / ankan
 - **`game`**: play a complete East or South match against three shanten-driven AIs.
 
+### Browser / packaging status
+
+The browser engine now supports seeded multi-hand East/South/West progression,
+legal player discard/riichi/tsumo/ron/chi/pon/kan actions, dora and ura-dora
+indicators, red-five-aware scoring, save/load, and a replay panel with a table
+snapshot. Advanced AI v1 can be selected for each browser opponent; it prefers
+safe discards against riichi threats and may riichi when tenpai. The browser
+scoring layer intentionally remains a compact rules implementation and should
+be parity-tested against the desktop scorer before competitive use.
+
+For optional external recommendations, run `python ai_advisor_server.py` on the
+same machine. The web page calls only `127.0.0.1:8766`; provider keys remain in
+environment variables (`MAHJONG_AI_PROVIDER`, `MAHJONG_AI_MODEL`, and
+`MAHJONG_AI_KEY_ENV`) and are never shipped to GitHub Pages. The advisor is
+manual and cannot perform an action automatically.
+
+PyInstaller builds are defined in `mahjong_card_reader.spec` and the
+`desktop-build.yml` workflow. GitHub Actions produces separate Linux, Windows,
+and macOS artifacts for a release tag or a manual workflow dispatch; actual
+platform artifacts must still be smoke-tested on each target OS.
+
 ## East/South match simulation
 
 Start an interactive game (you are always `You`; enter a tile or its displayed index):
