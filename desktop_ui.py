@@ -5,6 +5,7 @@ import os
 import queue
 import re
 import secrets
+import sys
 import threading
 import tkinter as tk
 import tkinter.font as tkfont
@@ -1061,9 +1062,17 @@ class MahjongDesktopApp:
 
 
 def main() -> None:
-    root = tk.Tk()
-    MahjongDesktopApp(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        MahjongDesktopApp(root)
+        root.mainloop()
+    except tk.TclError as exc:
+        print(
+            "无法启动桌面窗口：当前环境没有可用的图形界面。"
+            "请在本机桌面会话中运行 desktop_ui.py，或使用 main.py 启动命令行/网页版本。",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from exc
 
 
 if __name__ == "__main__":
