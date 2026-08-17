@@ -10,6 +10,7 @@ import threading
 import tkinter as tk
 import tkinter.font as tkfont
 from contextlib import redirect_stdout
+from pathlib import Path
 from tkinter import messagebox, ttk
 from unittest.mock import patch
 
