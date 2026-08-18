@@ -1,8 +1,72 @@
-# Mahjong Card Reader (Riichi Mahjong)
+# Riichi Mahjong Engine & AI Laboratory
+
+**Mahjong Card Reader** · an explainable, reproducible single-player Mahjong research demo
+
+> **A full Riichi Mahjong engine, AI opponent laboratory, and interactive decision assistant.**
+
+一个从手牌分析器发展而来的完整立直麻将研究型项目：包含向听与有效牌计算、役种与点数估算、可操作的单机牌局、可解释的 Basic/Advanced AI v1 对手、浏览器演示、事件回放，以及面向实验和复现的固定种子模拟工具。
 
 > **浏览器版入口 / Web preview:** [立即打开网页版助手](https://Y36366363.github.io/Mahjong_card_reader/) · [打开牌局设置](https://Y36366363.github.io/Mahjong_card_reader/#settings-panel)
 
-这是一个无需安装 Python 的静态网页入口；桌面版仍提供完整的本地对局和 Advanced AI v1。首次打开若显示 404，请先按下方说明在 **Settings → Pages** 将来源设为 **GitHub Actions**。
+这是一个无需安装 Python 的静态网页入口；桌面版提供完整的本地对局和 Advanced AI v1。首次打开若显示 404，请在 **Settings → Pages** 将来源设为 **GitHub Actions**。
+
+## Project at a glance
+
+| Area | What is demonstrated |
+| --- | --- |
+| Mahjong engine | Shanten, ukeire, furiten, riichi, calls, kans, dora/ura-dora, settlement, East/South/West progression |
+| AI laboratory | Deterministic Basic AI v1 and explainable Advanced AI v1 with efficiency, defense, push/fold, calls, riichi and placement heuristics |
+| Interactive clients | Tkinter desktop game plus a dependency-free browser client with Chinese, English and Japanese UI |
+| Reproducibility | Fixed seeds, JSON saves/replays, event snapshots, benchmark scripts and automated regression tests |
+| Engineering scope | Shared event contracts, safe optional external-AI hints, accessibility foundations and PyInstaller/GitHub Actions packaging |
+
+## Why this is a useful research demo
+
+The project treats Mahjong as a compact sequential-decision environment rather
+than only a card-reading task. Every decision can be tied to observable state:
+shanten distance, effective-tile breadth, visible tile counts, hand value,
+opponent threats, placement and risk. This makes the system suitable for
+demonstrating explainable heuristics, reproducible simulations and a path toward
+future learning-based policies without requiring large-scale reinforcement
+learning for the current release.
+
+## Current status
+
+- **Desktop:** playable local East/South matches with Basic AI v1 and Advanced AI v1.
+- **Browser:** playable seeded action engine, save/load, scoring layer and visual replay demo.
+- **Analysis:** shanten, waits, remaining tiles, point estimation and hint mode.
+- **Validation:** Python unit tests, browser-core tests, fixed-seed simulations and AI benchmarks.
+- **Known scope boundary:** the browser scorer is intentionally smaller than the exhaustive desktop scorer; external AI remains an optional manual hint and never takes actions automatically.
+
+## Quick start
+
+```bash
+# Analyze the sample configuration
+python main.py --config default_config.json
+
+# Start an interactive local match
+python main.py --mode game --seed 2026 --assist-mode hint
+
+# Run the regression suite
+python -m unittest discover -q
+```
+
+The desktop UI is available with `python desktop_ui.py`. The browser demo is
+the `web/` directory and can be opened through the GitHub Pages link above.
+
+## Repository map
+
+- `game.py`, `scoring.py`, `shanten.py`: core rules, scoring and AI decision logic.
+- `desktop_ui.py`: local Tkinter client and player-facing interaction layer.
+- `web/`: dependency-free browser assistant, action engine and replay surface.
+- `benchmark_ai.py`, `simulate_desktop_game.py`: reproducible experiments and match simulations.
+- `game_events.py`, `ai_assistant.py`: event/replay contract and optional safe AI advisor.
+- `mahjong_card_reader.spec`, `.github/workflows/`: standalone desktop packaging.
+
+<details>
+<summary><strong>Development history / Updates</strong>（点击展开）</summary>
+
+以下保留按日期整理的更新记录，便于审阅项目演进、实验依据和功能验证。
 
 ## Updates 7/30/2026
 
@@ -192,6 +256,8 @@
 - Added scoring options: **`riichi`** (+1 han) and **one concealed kong (ankan)** with fu adjustment.
 - Added **“Ron requires yaku”** enforcement (dora/aka-dora do not count as yaku).
 - Red fives are supported as `0m/0p/0s` and counted as **aka-dora** in points mode.
+
+</details>
 
 This project computes Riichi Mahjong outputs from **formatted tile text inputs**, including:
 
