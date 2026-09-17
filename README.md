@@ -4,6 +4,12 @@ A multilingual Riichi Mahjong engineering project combining hand analysis, scori
 
 [Open the browser demo](https://y36366363.github.io/Mahjong_card_reader/)
 
+## Interface Preview
+
+![Riichi Mahjong desktop interface](screenshots/mahjong-desktop.png)
+
+*Desktop interface showing a local Riichi Mahjong match. The browser implementation has a separate, experimental scope.*
+
 ## Main Features
 
 - Hand analysis for standard hands, seven pairs, and thirteen orphans.
