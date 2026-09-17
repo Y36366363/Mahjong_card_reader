@@ -1,8 +1,52 @@
 # Mahjong Card Reader (Riichi Mahjong)
 
-> **浏览器版入口 / Web preview:** [立即打开网页版助手](https://Y36366363.github.io/Mahjong_card_reader/) · [打开牌局设置](https://Y36366363.github.io/Mahjong_card_reader/#settings-panel)
+A multilingual Riichi Mahjong engineering project combining hand analysis, scoring, explainable heuristic opponents, and desktop/browser interfaces.
 
-这是一个无需安装 Python 的静态网页入口；桌面版仍提供完整的本地对局和 Advanced AI v1。首次打开若显示 404，请先按下方说明在 **Settings → Pages** 将来源设为 **GitHub Actions**。
+[Open the browser demo](https://y36366363.github.io/Mahjong_card_reader/)
+
+## Main Features
+
+- Hand analysis for standard hands, seven pairs, and thirteen orphans.
+- Shanten, winning waits, effective tiles, and visible-tile tracking.
+- Yaku and point calculation within the implemented rules.
+- Local desktop matches with English, Chinese, and Japanese interfaces.
+- Versioned Basic and Advanced heuristic AI profiles with decision diagnostics.
+- Seeded simulations, event records, and replay-related tooling.
+
+## Platform Scope
+
+| Component | Scope |
+|---|---|
+| Python analysis and scoring | Detailed local calculation with configurable hand context |
+| Desktop application | Local East/South matches, hints, calls, and settlement |
+| Browser version | Static JavaScript analysis and experimental gameplay |
+| External AI advisor | Optional local service; manual recommendations only |
+| Desktop packaging | Build configuration available; target-platform testing still required |
+
+The browser and Python implementations are not claimed to have complete rule or scoring parity. Rare rules and scoring combinations require further validation.
+
+## Engineering Focus
+
+The project emphasizes legal-action validation, concealed-information boundaries, reproducible simulations, explainable AI decisions, and multilingual interaction.
+
+The AI profiles are heuristic policies, not equilibrium solvers or professionally rated Mahjong agents. Fixed-seed benchmarks support implementation diagnostics, not a general strength claim.
+
+## Run Locally
+
+From the repository root, launch the desktop interface:
+
+    python desktop_ui.py
+
+Or start a seeded command-line match:
+
+    python main.py --mode game --seed 2026
+
+Existing setup instructions and detailed options are provided below. Tkinter must be available in the local Python installation.
+
+## Development Log
+
+<details>
+<summary>Expand development history / 展开开发记录</summary>
 
 ## Updates 7/30/2026
 
@@ -192,6 +236,10 @@
 - Added scoring options: **`riichi`** (+1 han) and **one concealed kong (ankan)** with fu adjustment.
 - Added **“Ron requires yaku”** enforcement (dora/aka-dora do not count as yaku).
 - Red fives are supported as `0m/0p/0s` and counted as **aka-dora** in points mode.
+
+</details>
+
+## Detailed Usage and Feature Reference
 
 This project computes Riichi Mahjong outputs from **formatted tile text inputs**, including:
 
@@ -445,12 +493,8 @@ Red fives are accepted as `0m 0p 0s` and are treated as normal 5s for shanten/co
 
 ## Browser preview and GitHub Pages
 
-The repository now includes a dependency-free static browser release in `web/`.
-It provides the shanten/effective-tile assistant, saved match settings, individual
-opponent AI choices, a responsive table preview, and an experimental seeded browser
-match slice with Basic AI opponents. The complete scoring/call/rule set remains a
-documented next phase rather than pretending this first browser slice is already the
-full desktop game.
+The repository includes a static JavaScript browser version under `web/`, with hand analysis, configurable opponents, and experimental gameplay. Its detailed capabilities and limitations are summarized in “Browser / packaging status” above. Full parity with the Python engine is not claimed.
+
 
 To publish it:
 
@@ -548,11 +592,7 @@ work.
   and now offers browser riichi, tsumo/ron settlement, basic pon/chi/kan offers,
   basic riichi/menzen-tsumo scoring, an event timeline viewer, and an opt-in
   Advanced AI v1 discard policy.
-- **Still being connected:** the existing `MahjongGame` loop still uses its tested
-  interactive compatibility adapter; browser full yaku/dora/fu parity and round
-  progression are not yet connected. Browser external AI remains intentionally
-  disabled because GitHub Pages must never receive a provider API key; the desktop
-  action is opt-in and manual.
+- **Remaining validation:** complete browser/Python scoring and rule parity, rare-rule coverage, and target-platform package smoke tests. Optional browser AI advice uses a local service; provider credentials must never be embedded in the GitHub Pages application.
 - **Safety boundary:** an external model is an advisor only. It cannot see
   concealed opponent hands, cannot bypass legal actions, and cannot directly
   mutate points or the wall. API keys must be supplied outside the repository,
