@@ -43,6 +43,18 @@ Or start a seeded command-line match:
 
 Existing setup instructions and detailed options are provided below. Tkinter must be available in the local Python installation.
 
+## Validation
+
+Run the Python regression tests from the repository root:
+
+    python -m unittest discover -s . -p "test_*.py" -v
+
+For a seeded desktop-interface simulation:
+
+    python simulate_desktop_game.py --games 4 --profile advanced_v1 --temperature 0.2 --assist hint --calls accept --json desktop_simulation.json
+
+These checks cover declared implementation behavior. They do not establish complete browser/Python parity or a general AI strength rating.
+
 ## Development Log
 
 <details>
