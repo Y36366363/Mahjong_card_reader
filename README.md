@@ -10,6 +10,12 @@
 
 这是一个无需安装 Python 的静态网页入口；桌面版提供完整的本地对局和 Advanced AI v1。首次打开若显示 404，请在 **Settings → Pages** 将来源设为 **GitHub Actions**。
 
+## Interface preview
+
+![Riichi Mahjong desktop interface](screenshots/mahjong-desktop.png)
+
+*A local desktop match: public table state, player hand, calls, scores and decision controls. The browser client has a separate experimental scope.*
+
 ## Project at a glance
 
 | Area | What is demonstrated |
@@ -37,6 +43,10 @@ learning for the current release.
 - **Analysis:** shanten, waits, remaining tiles, point estimation and hint mode.
 - **Validation:** Python unit tests, browser-core tests, fixed-seed simulations and AI benchmarks.
 - **Known scope boundary:** the browser scorer is intentionally smaller than the exhaustive desktop scorer; external AI remains an optional manual hint and never takes actions automatically.
+
+The AI profiles are explainable heuristic policies, not equilibrium solvers or
+professionally rated Mahjong agents. Fixed-seed benchmarks are implementation
+diagnostics, not general strength claims.
 
 ## Quick start
 
@@ -258,6 +268,8 @@ the `web/` directory and can be opened through the GitHub Pages link above.
 - Red fives are supported as `0m/0p/0s` and counted as **aka-dora** in points mode.
 
 </details>
+
+## Detailed usage and feature reference
 
 This project computes Riichi Mahjong outputs from **formatted tile text inputs**, including:
 
