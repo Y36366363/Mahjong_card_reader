@@ -2,9 +2,7 @@
 # Build with: pyinstaller --clean mahjong_card_reader.spec
 from pathlib import Path
 ROOT = Path(SPECPATH)
-datas = [
-    (str(ROOT / "web" / "assets" / "backgrounds"), "web/assets/backgrounds"),
-]
+datas = []
 
 a = Analysis(
     [str(ROOT / "desktop_ui.py")],

@@ -19,23 +19,20 @@ const TEXT = {
 TEXT.zh.skipToContent = "跳到主要内容";
 TEXT.en.skipToContent = "Skip to main content";
 TEXT.ja.skipToContent = "本文へ移動";
-Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "0 - 默认", backgroundAsset1: "1 - 天才麻将少女", backgroundAsset2: "2 - 辉夜大小姐", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "本地上传图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "项目图片请放入 web/assets/backgrounds/，对应 1/2/3 选项。" });
-Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "0 - Default", backgroundAsset1: "1 - Saki", backgroundAsset2: "2 - Kaguya-sama", backgroundAsset3: "3 - Re:Zero", backgroundUploaded: "Uploaded image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "Put project images in web/assets/backgrounds/ for options 1/2/3." });
-Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "0 - デフォルト", backgroundAsset1: "1 - 咲-Saki-", backgroundAsset2: "2 - かぐや様は告らせたい", backgroundAsset3: "3 - Re:ゼロ", backgroundUploaded: "アップロード画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "プロジェクト画像は web/assets/backgrounds/ に置くと 1/2/3 で選べます。" });
+Object.assign(TEXT.zh, { backgroundLabel: "背景", backgroundFelt: "默认", backgroundViolet: "紫色", backgroundRose: "玫瑰色", backgroundBlue: "蓝色", backgroundUploaded: "本地图片", uploadBackground: "选择本地背景图片（可选）", backgroundHelp: "图片仅保存在此浏览器中，不会上传到项目。请使用有权使用的图片。" });
+Object.assign(TEXT.en, { backgroundLabel: "Background", backgroundFelt: "Default", backgroundViolet: "Violet", backgroundRose: "Rose", backgroundBlue: "Blue", backgroundUploaded: "Local image", uploadBackground: "Choose a local background image (optional)", backgroundHelp: "The image stays in this browser and is not uploaded. Use an image you have the right to use." });
+Object.assign(TEXT.ja, { backgroundLabel: "背景", backgroundFelt: "デフォルト", backgroundViolet: "紫", backgroundRose: "ローズ", backgroundBlue: "青", backgroundUploaded: "ローカル画像", uploadBackground: "ローカル背景画像を選択（任意）", backgroundHelp: "画像はこのブラウザ内だけに保存され、アップロードされません。利用権のある画像を選んでください。" });
 Object.assign(TEXT.zh, { browserGameTitle: "浏览器牌局（实验阶段）", browserGameCopy: "使用固定种子开始可保存、可回放的浏览器牌局；其他三家可选择 Basic 或 Advanced AI v1。", browserStart: "开始浏览器牌局", browserSave: "下载存档", browserLoad: "读取存档", browserHand: "你的手牌", browserStatus: "牌局状态", browserNoGame: "尚未开始牌局", browserDiscard: "选择要打出的牌", browserSaved: "存档已下载", browserLoaded: "存档已读取", browserRiver: "牌河", browserRiichi: "立直", browserTsumo: "自摸", browserRon: "荣和", browserPon: "碰", browserChi: "吃", browserKan: "杠", browserCall: "鸣牌", browserPass: "跳过", browserNextHand: "确认进入下一局", browserFinal: "对局结束", browserSettlement: "本局结算", browserReplay: "事件回放", browserPrev: "上一事件", browserNext: "下一事件", browserReset: "回到最新", browserReplayState: "牌桌状态", browserLocalAI: "请求本地 AI 建议", browserLocalAIPending: "正在请求本地 AI…", browserLocalAIUnavailable: "本地 AI 服务不可用，请先启动 ai_advisor_server.py。" });
 Object.assign(TEXT.en, { browserGameTitle: "Browser match (experimental)", browserGameCopy: "Start a seeded, saveable and replayable browser match with Basic or Advanced AI v1 seats.", browserStart: "Start browser match", browserSave: "Download save", browserLoad: "Load save", browserHand: "Your hand", browserStatus: "Match status", browserNoGame: "No match started", browserDiscard: "Choose a discard", browserSaved: "Save downloaded", browserLoaded: "Save loaded", browserRiver: "River", browserRiichi: "Riichi", browserTsumo: "Tsumo", browserRon: "Ron", browserPon: "Pon", browserChi: "Chi", browserKan: "Kan", browserCall: "Call", browserPass: "Pass", browserNextHand: "Continue to next hand", browserFinal: "Match complete", browserSettlement: "Hand settlement", browserReplay: "Event replay", browserPrev: "Previous event", browserNext: "Next event", browserReset: "Latest event", browserReplayState: "Table state", browserLocalAI: "Ask local AI for a hint", browserLocalAIPending: "Requesting local AI…", browserLocalAIUnavailable: "Local AI service unavailable. Start ai_advisor_server.py first." });
 Object.assign(TEXT.ja, { browserGameTitle: "ブラウザ対局（試験版）", browserGameCopy: "固定シードで保存・再生できるブラウザ対局。Basic / Advanced AI v1 を選択できます。", browserStart: "ブラウザ対局を開始", browserSave: "セーブをダウンロード", browserLoad: "セーブを読み込む", browserHand: "あなたの手牌", browserStatus: "対局状態", browserNoGame: "対局は未開始です", browserDiscard: "捨てる牌を選択", browserSaved: "セーブをダウンロードしました", browserLoaded: "セーブを読み込みました", browserRiver: "捨て牌", browserRiichi: "リーチ", browserTsumo: "ツモ", browserRon: "ロン", browserPon: "ポン", browserChi: "チー", browserKan: "カン", browserCall: "鳴き", browserPass: "見逃す", browserNextHand: "次の局へ", browserFinal: "対局終了", browserSettlement: "局の精算", browserReplay: "イベント再生", browserPrev: "前のイベント", browserNext: "次のイベント", browserReset: "最新へ", browserReplayState: "卓の状態", browserLocalAI: "ローカル AI に提案を依頼", browserLocalAIPending: "ローカル AI に問い合わせ中…", browserLocalAIUnavailable: "ローカル AI サービスが利用できません。先に ai_advisor_server.py を起動してください。" });
 let currentLanguage = "zh";
 const t = (key) => TEXT[currentLanguage]?.[key] ?? TEXT.zh[key] ?? key;
 const BACKGROUND_STORAGE_KEY = "mahjong-card-reader-web-background-v1";
-const BACKGROUND_ASSETS = {
-  "asset-1": "assets/backgrounds/background-1.jpg",
-  "asset-2": "assets/backgrounds/background-2.jpg",
-  "asset-3": "assets/backgrounds/background-3.jpg",
-};
 const BACKGROUND_PRESETS = {
   default: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
-  felt: "linear-gradient(180deg, #edf3ef 0, #f8f5ed 46rem)",
+  violet: "linear-gradient(180deg, #dcd2e8 0, #f6f1f9 46rem)",
+  rose: "linear-gradient(180deg, #ead1d9 0, #faf1f3 46rem)",
+  blue: "linear-gradient(180deg, #d2e1ed 0, #f0f7fa 46rem)",
 };
 const BROWSER_SAVE_KEY = "mahjong-card-reader-browser-match-v1";
 let browserMatch = null;
@@ -76,8 +73,7 @@ function applyLanguage() {
 }
 
 function applyBackground(value) {
-  value = value === "felt" ? "default" : value;
-  if (!BACKGROUND_PRESETS[value] && !BACKGROUND_ASSETS[value] && value !== "uploaded") {
+  if (!BACKGROUND_PRESETS[value] && value !== "uploaded") {
     value = "default";
   }
   document.body.style.backgroundAttachment = "scroll";
@@ -85,13 +81,6 @@ function applyBackground(value) {
   if (preset) {
     document.body.style.backgroundImage = preset;
     document.body.style.backgroundSize = "auto";
-    return;
-  }
-  const asset = BACKGROUND_ASSETS[value];
-  if (asset) {
-    document.body.style.backgroundImage = `linear-gradient(rgba(8, 39, 31, .18), rgba(8, 39, 31, .18)), url("${asset}")`;
-    document.body.style.backgroundSize = "cover";
-    document.body.style.backgroundAttachment = "fixed";
     return;
   }
   const uploaded = localStorage.getItem(BACKGROUND_STORAGE_KEY);
@@ -186,8 +175,9 @@ function applySettings(saved) {
   $$(".ai-setting").forEach((element, index) => { element.value = saved.ai?.[index] || "basic_v1"; });
   const temperature = Number(saved.temperature);
   $("#temperature-setting").value = Number.isFinite(temperature) ? Math.min(1, Math.max(0, temperature)) : 0.2;
-  const savedBackground = saved.background === "felt" ? "default" : saved.background;
-  $("#background-setting").value = ["default", "asset-1", "asset-2", "asset-3", "uploaded"].includes(savedBackground)
+  const oldBackgrounds = { felt: "default", "asset-1": "violet", "asset-2": "rose", "asset-3": "blue" };
+  const savedBackground = oldBackgrounds[saved.background] || saved.background;
+  $("#background-setting").value = ["default", "violet", "rose", "blue", "uploaded"].includes(savedBackground)
     ? savedBackground : "default";
 }
 

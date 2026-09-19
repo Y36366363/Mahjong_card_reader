@@ -5,6 +5,8 @@ import unittest
 from unittest.mock import patch
 
 from desktop_ui import (
+    BACKGROUND_COLORS,
+    BACKGROUND_DISPLAY_TO_ID,
     FONT_SCALES,
     GameAborted,
     AI_LINEUP_PRESETS,
@@ -29,6 +31,10 @@ from desktop_ui import (
 
 
 class DesktopUIAdapterTests(unittest.TestCase):
+    def test_background_options_are_color_themes_without_bundled_artwork(self) -> None:
+        self.assertEqual(set(BACKGROUND_DISPLAY_TO_ID.values()), set(BACKGROUND_COLORS))
+        self.assertEqual(set(BACKGROUND_COLORS), {"default", "violet", "rose", "blue"})
+
     def test_human_seat_is_at_the_bottom_of_the_table(self) -> None:
         self.assertEqual(TABLE_POSITIONS[0], (2, 1))
         self.assertEqual(TABLE_POSITIONS[2], (0, 1))

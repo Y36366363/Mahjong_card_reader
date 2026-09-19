@@ -56,17 +56,21 @@ class WebReleaseTests(unittest.TestCase):
         self.assertIn("function shareSettings", app)
         self.assertIn("#settings=", app)
         self.assertIn('id="share-settings-button"', index)
-        for key in ("backgroundLabel", "backgroundAsset1", "backgroundUploaded", "backgroundHelp"):
+        for key in ("backgroundLabel", "backgroundViolet", "backgroundRose", "backgroundBlue", "backgroundUploaded", "backgroundHelp"):
             self.assertGreaterEqual(app.count(key), 3, key)
         self.assertIn('id="background-setting"', index)
         self.assertIn('id="background-file"', index)
+        for color in ("violet", "rose", "blue"):
+            self.assertIn(f'value="{color}"', index)
+        for old_asset in ("background-1.jpg", "background-2.jpg", "background-3.jpg"):
+            self.assertNotIn(old_asset, app)
+            self.assertNotIn(old_asset, index)
         self.assertIn('id="analysis-status" class="status" data-i18n="waiting"', index)
         for element_id in ("browser-start-button", "browser-save-button", "browser-load-input", "browser-hand", "browser-replay-list", "browser-replay-prev"):
             self.assertIn(f'id="{element_id}"', index)
         self.assertTrue((WEB / "assets" / "backgrounds" / "README.md").is_file())
-        for number in (1, 2, 3):
-            self.assertTrue((WEB / "assets" / "backgrounds" / f"background-{number}.jpg").is_file())
-            self.assertTrue((WEB / "assets" / "backgrounds" / f"background-{number}.png").is_file())
+        self.assertFalse(list((WEB / "assets" / "backgrounds").glob("*.jpg")))
+        self.assertFalse(list((WEB / "assets" / "backgrounds").glob("*.png")))
 
 
 if __name__ == "__main__":

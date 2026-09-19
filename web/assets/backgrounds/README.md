@@ -1,19 +1,8 @@
-# Browser background images
+# Background assets
 
-Put optional project background images in this folder using these exact names:
+This folder contains no bundled background images. The browser and desktop
+application offer built-in color themes instead. Browser users may select a
+local PNG/JPEG/WebP/AVIF image through the settings panel; it is stored only
+in that browser's local storage and is not uploaded to the repository.
 
-- `background-1.jpg` — 1《天才麻将少女》
-- `background-2.jpg` — 2《辉夜大小姐》
-- `background-3.jpg` — 3《Re:Zero》
-
-The browser settings panel exposes them as options **1/2/3**. JPG, PNG,
-WebP, and AVIF are supported by modern browsers; keep each image reasonably
-small (for example, under 2 MB) so GitHub Pages loads quickly.
-
-The desktop app reads `background-1.png`, `background-2.png`, and
-`background-3.png` as the matching local artwork. Keep the JPG and PNG pairs
-with the same numbers when replacing the images.
-
-You can also select any local image directly in the web page. A locally selected
-image is stored only in that browser's local storage and is not uploaded to the
-repository.
+Do not add third-party artwork here without permission to redistribute it.

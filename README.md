@@ -548,20 +548,11 @@ source to **GitHub Actions** under **Settings → Pages**.
 
 ### Browser backgrounds
 
-The settings panel includes several built-in color themes and a local image
-picker. To add images to the public project, place these files in
-`web/assets/backgrounds/`:
-
-- `background-1.jpg` — 1《天才麻将少女》
-- `background-2.jpg` — 2《辉夜大小姐》
-- `background-3.jpg` — 3《Re:Zero》
-
-The browser selector uses **0 - Default**, **1 - Saki**, **2 - Kaguya-sama**,
-and **3 - Re:Zero**. The three project images appear after the next Pages deployment.
-The desktop setup screen uses the matching `.png` companions in the same folder
-so the selected artwork is rendered as an actual background image.
-Users may also choose a local PNG/JPEG/WebP/AVIF file; that choice stays in
-their browser and is not uploaded to GitHub.
+The browser includes default, violet, rose, and blue color themes. The desktop
+setup screen offers matching color themes without bundled background artwork.
+Browser users can also choose a local PNG/JPEG/WebP/AVIF image; it stays in
+that browser's local storage and is not uploaded to GitHub or bundled with the
+project. Only use an image you have the right to use.
 
 ### If `Configure Pages` fails with `Not Found`
 
