@@ -942,3 +942,7 @@ python benchmark_ai.py --games 24 --workers 4 --seed 800 \
 ### 8. 当前规则支持范围
 
 目前模拟器支持：开局一次洗牌后固定牌山、荣和/自摸结算、本场、立直棒、连庄、流局听牌罚符、振听、公开吃碰杠、明杠岭上摸牌、杠宝牌和多家荣和检查。和牌役种与点数沿用项目现有计分模块。抢杠、主动暗杠/加杠、一发、岭上开花役、海底/河底、途中流局等较少见规则仍属于后续扩展范围。
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
